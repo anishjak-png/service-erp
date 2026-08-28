@@ -1,0 +1,375 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Customer {
+  id                         String    @id @default(cuid())
+  name                       String?
+  mobile                     String    @unique
+  address                    String?
+  allowWhatsappNotifications Boolean   @default(true)
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  jobCards                   JobCard[]
+  whatsAppConversations      WhatsAppConversation[]
+}
+
+enum JobStatus {
+  Pending
+  WaitingForCustomerApproval
+  Outsourced
+  WarrantyPending
+  WarrantyWithCompany
+  Ready
+  Return
+  Delivered
+}
+
+enum DeliveryContactStatus {
+  not_contacted
+  contacted
+}
+
+model LookupOption {
+  id       String @id @default(cuid())
+  category String
+  value    String
+
+  @@unique([category, value])
+  @@index([category])
+}
+
+model Technician {
+  id                String                @id @default(cuid())
+  name              String                @unique
+  active            Boolean               @default(true)
+  assignedJobs      JobCard[]             @relation("AssignedTechnician")
+  completedJobs     JobCard[]             @relation("CompletedByTechnician")
+  applianceMappings ApplianceTechnician[]
+  staffUsers        StaffUser[]
+  createdAt         DateTime              @default(now())
+}
+
+enum StaffRole {
+  reception
+  technician
+  admin
+}
+
+enum DevicePlatform {
+  android
+  web
+}
+
+enum DeviceStatus {
+  pending
+  approved
+  revoked
+}
+
+model StaffUser {
+  id              String        @id @default(cuid())
+  mobile          String        @unique
+  passwordHash    String
+  name            String
+  role            StaffRole
+  active          Boolean       @default(true)
+  technicianId    String?
+  technician      Technician?   @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  devices         StaffDevice[] @relation("StaffDevices")
+  approvedDevices StaffDevice[] @relation("ApprovedByStaff")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([role])
+  @@index([technicianId])
+}
+
+model StaffDevice {
+  id           String         @id @default(cuid())
+  staffUserId  String
+  staffUser    StaffUser      @relation("StaffDevices", fields: [staffUserId], references: [id], onDelete: Cascade)
+  deviceId     String
+  deviceLabel  String?
+  platform     DevicePlatform
+  status       DeviceStatus   @default(pending)
+  lastSeenAt   DateTime       @default(now())
+  approvedAt   DateTime?
+  approvedById String?
+  approvedBy   StaffUser?     @relation("ApprovedByStaff", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime       @default(now())
+
+  @@unique([staffUserId, deviceId])
+  @@index([status])
+  @@index([staffUserId])
+}
+
+model ApplianceTechnician {
+  id            String     @id @default(cuid())
+  applianceType String     @unique
+  technicianId  String
+  technician    Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+}
+
+model ApplianceBrand {
+  id            String @id @default(cuid())
+  applianceType String
+  brand         String
+
+  @@unique([applianceType, brand])
+  @@index([applianceType])
+}
+
+model ApplianceComplaint {
+  id            String @id @default(cuid())
+  applianceType String
+  complaint     String
+
+  @@unique([applianceType, complaint])
+  @@index([applianceType])
+}
+
+model ApplianceAccessory {
+  id            String @id @default(cuid())
+  applianceType String
+  accessory     String
+
+  @@unique([applianceType, accessory])
+  @@index([applianceType])
+}
+
+model OutsourcePartner {
+  id              String    @id @default(cuid())
+  name            String    @unique
+  active          Boolean   @default(true)
+  outsourcedJobs  JobCard[] @relation("OutsourcedTo")
+  completedJobs   JobCard[] @relation("CompletedByOutsource")
+  createdAt       DateTime  @default(now())
+}
+
+model JobCard {
+  id                   String          @id @default(cuid())
+  jobNumber            String          @unique
+  customerId           String
+  customer             Customer        @relation(fields: [customerId], references: [id])
+  applianceType        String
+  brand                String
+  model                String?
+  complaint            String
+  physicalCondition    String?
+  productPhotos        String?
+  warrantyCardPhotos   String?
+  accessories          String?
+  serviceAmount        Float?
+  status               JobStatus       @default(Pending)
+  remarks                      String?
+  whatsappNotificationsOverride Boolean?
+  receivedAt                   DateTime        @default(now())
+  readyAt              DateTime?
+  deliveredAt          DateTime?
+  deliveryContactStatus DeliveryContactStatus @default(not_contacted)
+  expectedDeliveryAt   DateTime?
+  createdBy            String?
+  assignedTechnicianId     String?
+  assignedTechnician       Technician?     @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
+  completedByTechnicianId  String?
+  completedByTechnician    Technician?     @relation("CompletedByTechnician", fields: [completedByTechnicianId], references: [id])
+  outsourcedToId           String?
+  outsourcedTo             OutsourcePartner? @relation("OutsourcedTo", fields: [outsourcedToId], references: [id], onDelete: SetNull)
+  outsourcedAt             DateTime?
+  completedByOutsourceId     String?
+  completedByOutsource     OutsourcePartner? @relation("CompletedByOutsource", fields: [completedByOutsourceId], references: [id], onDelete: SetNull)
+  isWarranty               Boolean           @default(false)
+  warrantyPurchaseDate     DateTime?
+  warrantyTakenAt          DateTime?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  statusHistory            StatusHistory[]
+  printJobs                PrintJob[]
+  notificationLogs         NotificationLog[]
+  whatsAppMessages         WhatsAppMessage[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([assignedTechnicianId])
+  @@index([assignedTechnicianId, status, receivedAt])
+  @@index([status, receivedAt])
+  @@index([completedByTechnicianId])
+  @@index([outsourcedToId])
+  @@index([completedByOutsourceId])
+  @@index([isWarranty])
+  @@index([brand])
+  @@index([receivedAt])
+}
+
+model StatusHistory {
+  id        String    @id @default(cuid())
+  jobCardId String
+  jobCard   JobCard   @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  status    JobStatus
+  note      String?
+  changedBy String?
+  changedAt DateTime  @default(now())
+
+  @@index([jobCardId])
+}
+
+model JobSequence {
+  id      Int @id @default(1)
+  lastNum Int @default(0)
+}
+
+enum PrintJobStatus {
+  Pending
+  Printing
+  Printed
+  Failed
+}
+
+model PrintJob {
+  id           String         @id @default(cuid())
+  jobCardId    String?
+  jobCard      JobCard?       @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  type         String         @default("receipt")
+  payload      Json?
+  status       PrintJobStatus @default(Pending)
+  branchId     String         @default("main")
+  printerId    String         @default("counter-1")
+  attempts     Int            @default(0)
+  errorMessage String?
+  createdAt    DateTime       @default(now())
+  printedAt    DateTime?
+
+  @@index([branchId, printerId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+enum NotificationEventType {
+  JOB_CREATED
+  JOB_READY
+  JOB_RETURN
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+  PUSH
+}
+
+enum NotificationDeliveryStatus {
+  Pending
+  Sent
+  Failed
+  Skipped
+}
+
+enum WhatsAppProviderType {
+  meta
+  interakt
+  twilio
+  custom
+}
+
+model NotificationSettings {
+  id                  String               @id @default("default")
+  masterEnabled       Boolean              @default(true)
+  jobCreatedEnabled   Boolean              @default(true)
+  jobReadyEnabled     Boolean              @default(true)
+  jobReturnEnabled    Boolean              @default(true)
+  trackingLinkEnabled Boolean              @default(true)
+  provider            WhatsAppProviderType @default(meta)
+  apiUrl              String?
+  apiKey              String?
+  accessToken         String?
+  phoneNumberId       String?
+  whatsappBusinessAccountId String?
+  businessNumber      String?
+  additionalHeaders   String?
+  updatedAt           DateTime             @updatedAt
+}
+
+model NotificationTemplate {
+  id        String                @id @default(cuid())
+  eventType NotificationEventType @unique
+  body      String
+  updatedAt DateTime              @updatedAt
+}
+
+model NotificationLog {
+  id          String                     @id @default(cuid())
+  jobCardId   String
+  jobCard     JobCard                    @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  eventType   NotificationEventType
+  channel     NotificationChannel        @default(WHATSAPP)
+  status      NotificationDeliveryStatus
+  recipient   String
+  messageBody String?
+  provider    String?
+  externalId  String?
+  error       String?
+  manual      Boolean                    @default(false)
+  createdAt   DateTime                   @default(now())
+
+  @@index([jobCardId, eventType, channel])
+  @@index([createdAt])
+}
+
+enum WhatsAppMessageDirection {
+  inbound
+  outbound
+}
+
+enum WhatsAppMessageType {
+  text
+  image
+  reaction
+  unsupported
+}
+
+enum WhatsAppMessageStatus {
+  received
+  sent
+  failed
+}
+
+model WhatsAppConversation {
+  id                 String            @id @default(cuid())
+  customerMobile     String            @unique
+  customerId         String?
+  customer           Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lastMessageAt      DateTime          @default(now())
+  lastMessagePreview String?
+  unreadCount        Int               @default(0)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  messages           WhatsAppMessage[]
+
+  @@index([lastMessageAt])
+}
+
+model WhatsAppMessage {
+  id                 String                   @id @default(cuid())
+  conversationId     String
+  conversation       WhatsAppConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction          WhatsAppMessageDirection
+  wamid              String                   @unique
+  messageType        WhatsAppMessageType
+  body               String?
+  mediaId            String?
+  reactedToWamid     String?
+  status             WhatsAppMessageStatus
+  sentByStaffUserId  String?
+  jobCardId          String?
+  jobCard            JobCard?                 @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
+  rawPayload         String?
+  createdAt          DateTime                 @default(now())
+
+  @@index([conversationId, createdAt])
+}
