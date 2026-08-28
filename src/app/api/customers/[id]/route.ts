@@ -13,8 +13,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
   const { id } = await context.params;
 
-  const customer = await prisma.customer.findUnique({
-    where: { id },
+  const customer = await prisma.customer.findFirst({
+    where: { id, ...(session.tenantId ? { tenantId: session.tenantId } : {}) },
     include: { _count: { select: { jobCards: true } } },
   });
 
@@ -37,7 +37,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const body = await request.json();
 
-  const existing = await prisma.customer.findUnique({ where: { id } });
+  const existing = await prisma.customer.findFirst({
+    where: { id, ...(session.tenantId ? { tenantId: session.tenantId } : {}) },
+  });
   if (!existing) {
     return NextResponse.json({ error: "Customer not found" }, { status: 404 });
   }
@@ -59,7 +61,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (body.mobile && mobile !== existing.mobile) {
-      const duplicate = await prisma.customer.findUnique({ where: { mobile } });
+      const duplicate = await prisma.customer.findUnique({
+        where: {
+          tenantId_mobile: {
+            tenantId: existing.tenantId,
+            mobile,
+          },
+        },
+      });
       if (duplicate) {
         return NextResponse.json(
           { error: "Mobile number already in use" },

@@ -12,28 +12,30 @@ model Tenant {
   id        String   @id @default(cuid())
   slug      String   @unique
   name      String
-  phone     String?
+  phone     String   @default("")
   logoUrl   String?
   jobPrefix String   @default("SE")
-  status    String   @default("active")
+  status    String   @default("active") // active|suspended
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   customers             Customer[]
-  lookupOptions         LookupOption[]
+  jobCards              JobCard[]
   technicians           Technician[]
   staffUsers            StaffUser[]
+  staffDevices          StaffDevice[]
+  lookupOptions         LookupOption[]
   applianceTechnicians  ApplianceTechnician[]
+  applianceAccessories  ApplianceAccessory[]
   applianceBrands       ApplianceBrand[]
   applianceComplaints   ApplianceComplaint[]
-  applianceAccessories  ApplianceAccessory[]
   outsourcePartners     OutsourcePartner[]
-  jobCards              JobCard[]
-  jobSequences          JobSequence[]
   printJobs             PrintJob[]
   notificationSettings  NotificationSettings?
   notificationTemplates NotificationTemplate[]
+  notificationLogs      NotificationLog[]
   whatsAppConversations WhatsAppConversation[]
+  whatsAppMessages      WhatsAppMessage[]
+  jobSequence           JobSequence?
 }
 
 model Customer {
@@ -130,13 +132,15 @@ model StaffUser {
   updatedAt       DateTime      @updatedAt
 
   @@unique([tenantId, mobile])
-  @@index([tenantId, role])
+  @@index([tenantId])
+  @@index([role])
   @@index([technicianId])
 }
 
 model StaffDevice {
   id           String         @id @default(cuid())
   tenantId     String
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   staffUserId  String
   staffUser    StaffUser      @relation("StaffDevices", fields: [staffUserId], references: [id], onDelete: Cascade)
   deviceId     String
@@ -150,7 +154,8 @@ model StaffDevice {
   createdAt    DateTime       @default(now())
 
   @@unique([staffUserId, deviceId])
-  @@index([tenantId, status])
+  @@index([tenantId])
+  @@index([status])
   @@index([staffUserId])
 }
 
@@ -214,58 +219,62 @@ model OutsourcePartner {
 }
 
 model JobCard {
-  id                        String                 @id @default(cuid())
-  tenantId                  String
-  tenant                    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  jobNumber                 String
-  customerId                String
-  customer                  Customer               @relation(fields: [customerId], references: [id])
-  applianceType             String
-  brand                     String
-  model                     String?
-  complaint                 String
-  physicalCondition         String?
-  productPhotos             String?
-  warrantyCardPhotos        String?
-  accessories               String?
-  serviceAmount             Float?
-  status                    JobStatus              @default(Pending)
-  remarks                   String?
+  id                            String                @id @default(cuid())
+  tenantId                      String
+  tenant                        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  jobNumber                     String
+  customerId                    String
+  customer                      Customer              @relation(fields: [customerId], references: [id])
+  applianceType                 String
+  brand                         String
+  model                         String?
+  complaint                     String
+  physicalCondition             String?
+  productPhotos                 String?
+  warrantyCardPhotos            String?
+  accessories                   String?
+  serviceAmount                 Float?
+  status                        JobStatus             @default(Pending)
+  remarks                       String?
   whatsappNotificationsOverride Boolean?
-  receivedAt                DateTime               @default(now())
-  readyAt                   DateTime?
-  deliveredAt               DateTime?
-  deliveryContactStatus     DeliveryContactStatus  @default(not_contacted)
-  expectedDeliveryAt        DateTime?
-  createdBy                 String?
-  assignedTechnicianId      String?
-  assignedTechnician        Technician?            @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
-  completedByTechnicianId   String?
-  completedByTechnician     Technician?            @relation("CompletedByTechnician", fields: [completedByTechnicianId], references: [id])
-  outsourcedToId            String?
-  outsourcedTo              OutsourcePartner?      @relation("OutsourcedTo", fields: [outsourcedToId], references: [id], onDelete: SetNull)
-  outsourcedAt              DateTime?
-  completedByOutsourceId    String?
-  completedByOutsource      OutsourcePartner?      @relation("CompletedByOutsource", fields: [completedByOutsourceId], references: [id], onDelete: SetNull)
-  isWarranty                Boolean                @default(false)
-  warrantyPurchaseDate      DateTime?
-  warrantyTakenAt           DateTime?
-  createdAt                 DateTime               @default(now())
-  updatedAt                 DateTime               @updatedAt
-  statusHistory             StatusHistory[]
-  printJobs                 PrintJob[]
-  notificationLogs          NotificationLog[]
-  whatsAppMessages          WhatsAppMessage[]
+  receivedAt                    DateTime              @default(now())
+  readyAt                       DateTime?
+  deliveredAt                   DateTime?
+  deliveryContactStatus         DeliveryContactStatus @default(not_contacted)
+  expectedDeliveryAt            DateTime?
+  createdBy                     String?
+  assignedTechnicianId          String?
+  assignedTechnician            Technician?           @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
+  completedByTechnicianId       String?
+  completedByTechnician         Technician?           @relation("CompletedByTechnician", fields: [completedByTechnicianId], references: [id])
+  outsourcedToId                String?
+  outsourcedTo                  OutsourcePartner?     @relation("OutsourcedTo", fields: [outsourcedToId], references: [id], onDelete: SetNull)
+  outsourcedAt                  DateTime?
+  completedByOutsourceId        String?
+  completedByOutsource          OutsourcePartner?     @relation("CompletedByOutsource", fields: [completedByOutsourceId], references: [id], onDelete: SetNull)
+  isWarranty                    Boolean               @default(false)
+  warrantyPurchaseDate          DateTime?
+  warrantyTakenAt               DateTime?
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
+  statusHistory                 StatusHistory[]
+  printJobs                     PrintJob[]
+  notificationLogs              NotificationLog[]
+  whatsAppMessages              WhatsAppMessage[]
 
   @@unique([tenantId, jobNumber])
   @@index([tenantId])
-  @@index([tenantId, status])
-  @@index([tenantId, customerId])
-  @@index([tenantId, assignedTechnicianId, status, receivedAt])
-  @@index([tenantId, status, receivedAt])
-  @@index([tenantId, isWarranty])
-  @@index([tenantId, brand])
-  @@index([tenantId, receivedAt])
+  @@index([customerId])
+  @@index([status])
+  @@index([assignedTechnicianId])
+  @@index([assignedTechnicianId, status, receivedAt])
+  @@index([status, receivedAt])
+  @@index([completedByTechnicianId])
+  @@index([outsourcedToId])
+  @@index([completedByOutsourceId])
+  @@index([isWarranty])
+  @@index([brand])
+  @@index([receivedAt])
 }
 
 model StatusHistory {
@@ -281,7 +290,7 @@ model StatusHistory {
 }
 
 model JobSequence {
-  id       Int    @id @default(autoincrement())
+  id       String @id @default(cuid())
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lastNum  Int    @default(0)
@@ -310,8 +319,9 @@ model PrintJob {
   createdAt    DateTime       @default(now())
   printedAt    DateTime?
 
-  @@index([tenantId, branchId, printerId, status, createdAt])
-  @@index([tenantId, status, createdAt])
+  @@index([tenantId])
+  @@index([branchId, printerId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 enum NotificationEventType {
@@ -345,10 +355,10 @@ model NotificationSettings {
   id                        String               @id @default(cuid())
   tenantId                  String               @unique
   tenant                    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  masterEnabled             Boolean              @default(false)
-  jobCreatedEnabled         Boolean              @default(false)
-  jobReadyEnabled           Boolean              @default(false)
-  jobReturnEnabled          Boolean              @default(false)
+  masterEnabled             Boolean              @default(true)
+  jobCreatedEnabled         Boolean              @default(true)
+  jobReadyEnabled           Boolean              @default(true)
+  jobReturnEnabled          Boolean              @default(true)
   trackingLinkEnabled       Boolean              @default(true)
   provider                  WhatsAppProviderType @default(meta)
   apiUrl                    String?
@@ -370,10 +380,13 @@ model NotificationTemplate {
   updatedAt DateTime              @updatedAt
 
   @@unique([tenantId, eventType])
+  @@index([tenantId])
 }
 
 model NotificationLog {
   id          String                     @id @default(cuid())
+  tenantId    String
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   jobCardId   String
   jobCard     JobCard                    @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
   eventType   NotificationEventType
@@ -387,6 +400,7 @@ model NotificationLog {
   manual      Boolean                    @default(false)
   createdAt   DateTime                   @default(now())
 
+  @@index([tenantId])
   @@index([jobCardId, eventType, channel])
   @@index([createdAt])
 }
@@ -424,15 +438,18 @@ model WhatsAppConversation {
   messages           WhatsAppMessage[]
 
   @@unique([tenantId, customerMobile])
-  @@index([tenantId, lastMessageAt])
+  @@index([tenantId])
+  @@index([lastMessageAt])
 }
 
 model WhatsAppMessage {
   id                String                   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   conversationId    String
   conversation      WhatsAppConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   direction         WhatsAppMessageDirection
-  wamid             String
+  wamid             String                   @unique
   messageType       WhatsAppMessageType
   body              String?
   mediaId           String?
@@ -444,6 +461,6 @@ model WhatsAppMessage {
   rawPayload        String?
   createdAt         DateTime                 @default(now())
 
-  @@unique([conversationId, wamid])
+  @@index([tenantId])
   @@index([conversationId, createdAt])
 }

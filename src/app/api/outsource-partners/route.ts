@@ -4,12 +4,12 @@ import { prisma } from "@/lib/db";
 
 export async function GET() {
   const session = await requireStaff(["reception", "technician", "admin"]);
-  if (!session) {
+  if (!session?.tenantId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const partners = await prisma.outsourcePartner.findMany({
-    where: { active: true },
+    where: { tenantId: session.tenantId, active: true },
     orderBy: { name: "asc" },
     select: { id: true, name: true, active: true },
   });
@@ -19,7 +19,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await requireAdmin();
-  if (!session) {
+  if (!session?.tenantId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -30,9 +30,11 @@ export async function POST(request: NextRequest) {
   }
 
   const partner = await prisma.outsourcePartner.upsert({
-    where: { name: trimmed },
+    where: {
+      tenantId_name: { tenantId: session.tenantId, name: trimmed },
+    },
     update: { active: true },
-    create: { name: trimmed },
+    create: { tenantId: session.tenantId, name: trimmed },
   });
 
   return NextResponse.json(partner, { status: 201 });

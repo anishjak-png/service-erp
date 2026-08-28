@@ -4,7 +4,13 @@ import { prisma } from "@/lib/db";
 
 export async function GET() {
   try {
+    const session = await requireAdmin();
+    if (!session?.tenantId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const mappings = await prisma.applianceTechnician.findMany({
+      where: { tenantId: session.tenantId },
       include: { technician: true },
       orderBy: { applianceType: "asc" },
     });
@@ -35,10 +41,17 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const tenantId = session.tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: "Tenant context required" }, { status: 401 });
+    }
+
     const mapping = await prisma.applianceTechnician.upsert({
-      where: { applianceType },
+      where: {
+        tenantId_applianceType: { tenantId, applianceType },
+      },
       update: { technicianId },
-      create: { applianceType, technicianId },
+      create: { tenantId, applianceType, technicianId },
       include: { technician: true },
     });
 

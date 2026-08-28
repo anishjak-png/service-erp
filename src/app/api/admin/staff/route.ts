@@ -9,11 +9,12 @@ import {
 
 export async function GET() {
   const session = await requireAdmin();
-  if (!session) {
+  if (!session?.tenantId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const staff = await prisma.staffUser.findMany({
+    where: { tenantId: session.tenantId },
     orderBy: [{ role: "asc" }, { name: "asc" }],
     include: {
       technician: { select: { id: true, name: true } },
@@ -38,9 +39,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await requireAdmin();
-  if (!session) {
+  if (!session?.tenantId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const tenantId = session.tenantId;
 
   const body = await request.json();
   const mobileRaw = body.mobile;
@@ -86,12 +88,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (technicianId) {
-    const tech = await prisma.technician.findUnique({ where: { id: technicianId } });
+    const tech = await prisma.technician.findFirst({
+      where: { id: technicianId, tenantId },
+    });
     if (!tech) {
       return NextResponse.json({ error: "Technician not found" }, { status: 404 });
     }
     const existingLink = await prisma.staffUser.findFirst({
-      where: { technicianId, active: true },
+      where: { tenantId, technicianId, active: true },
     });
     if (existingLink) {
       return NextResponse.json(
@@ -102,7 +106,9 @@ export async function POST(request: NextRequest) {
   }
 
   const mobile = normalizeMobile(mobileRaw);
-  const existing = await prisma.staffUser.findUnique({ where: { mobile } });
+  const existing = await prisma.staffUser.findUnique({
+    where: { tenantId_mobile: { tenantId, mobile } },
+  });
   if (existing) {
     return NextResponse.json(
       { error: "Mobile number already registered" },
@@ -113,6 +119,7 @@ export async function POST(request: NextRequest) {
   const passwordHash = await hashPassword(password);
   const staffUser = await prisma.staffUser.create({
     data: {
+      tenantId,
       mobile,
       name,
       role,
