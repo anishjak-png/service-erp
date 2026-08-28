@@ -85,7 +85,7 @@ export default function SignupPage() {
                 id="shopName"
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
-                placeholder="e.g. Uma Service"
+                placeholder="e.g. Acme Appliance Service"
                 className="flex h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                 autoFocus
                 required

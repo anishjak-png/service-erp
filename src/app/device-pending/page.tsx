@@ -1,6 +1,6 @@
 "use client";
 
-import { SHOP_NAME } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -40,7 +40,7 @@ export default function DevicePendingPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-50 to-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl text-amber-800">{SHOP_NAME}</CardTitle>
+          <CardTitle className="text-xl text-amber-800">{APP_NAME}</CardTitle>
           <p className="text-sm text-slate-500">Waiting for device approval</p>
         </CardHeader>
         <CardContent className="space-y-4 text-center">

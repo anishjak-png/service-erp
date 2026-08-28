@@ -493,7 +493,7 @@ export function WhatsAppInboxTab({
                 <path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.07L2 22l4.93-1.29A9.96 9.96 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.66 0-3.21-.45-4.55-1.24l-.33-.2-2.92.76.78-2.85-.21-.33A7.96 7.96 0 014 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z" />
               </svg>
             </div>
-            <p className="text-lg font-light text-[#41525D]">UMA WhatsApp Inbox</p>
+            <p className="text-lg font-light text-[#41525D]">WhatsApp Inbox</p>
             <p className="mt-2 max-w-sm text-sm text-[#667781]">
               Select a chat to view automated job messages and customer replies.
             </p>

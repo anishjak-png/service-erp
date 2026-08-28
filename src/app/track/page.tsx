@@ -1,8 +1,9 @@
 "use client";
 
-import { SHOP_NAME } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
 import { formatMobileDisplay } from "@/lib/jobs";
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -18,7 +19,10 @@ type TrackResult = {
   statusLabel: string;
 };
 
-export default function TrackPage() {
+function TrackForm() {
+  const searchParams = useSearchParams();
+  const tenantFromUrl = searchParams.get("tenant")?.trim() ?? "";
+  const [tenantSlug, setTenantSlug] = useState(tenantFromUrl);
   const [mobile, setMobile] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<TrackResult[] | null>(null);
@@ -31,7 +35,10 @@ export default function TrackPage() {
     setResults(null);
 
     const digits = mobile.replace(/\D/g, "").slice(-10);
-    const res = await fetch(`/api/track?mobile=${digits}`);
+    const qs = new URLSearchParams({ mobile: digits });
+    if (tenantSlug.trim()) qs.set("tenant", tenantSlug.trim().toLowerCase());
+
+    const res = await fetch(`/api/track?${qs.toString()}`);
     const data = await res.json();
 
     if (!res.ok) {
@@ -48,11 +55,24 @@ export default function TrackPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-emerald-800">{SHOP_NAME}</CardTitle>
+          <CardTitle className="text-2xl text-emerald-800">{APP_NAME}</CardTitle>
           <p className="text-sm text-slate-500">Track your service status</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-2">
+              <label htmlFor="tenant" className="text-sm font-medium text-slate-700">
+                Shop slug
+              </label>
+              <input
+                id="tenant"
+                type="text"
+                value={tenantSlug}
+                onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
+                placeholder="e.g. demo"
+                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              />
+            </div>
             <div className="space-y-2">
               <label htmlFor="mobile" className="text-sm font-medium text-slate-700">
                 Mobile Number
@@ -80,31 +100,48 @@ export default function TrackPage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           {results && results.length === 0 && (
-            <p className="text-center text-sm text-slate-500">
-              No jobs found for {formatMobileDisplay(mobile)}
-            </p>
+            <p className="text-sm text-slate-500">No jobs found for this mobile.</p>
           )}
 
           {results && results.length > 0 && (
-            <div className="space-y-2">
+            <ul className="space-y-2">
               {results.map((job) => (
-                <div
+                <li
                   key={job.jobNumber}
-                  className="rounded-lg border border-slate-200 bg-white p-4 text-sm"
+                  className="rounded-md border border-slate-200 bg-white p-3 text-sm"
                 >
-                  <p className="font-semibold text-slate-900">{job.jobNumber}</p>
-                  <p className="text-slate-600">{job.applianceType}</p>
-                  <p className="text-slate-600">
-                    {job.brand}
+                  <div className="font-medium text-slate-800">{job.jobNumber}</div>
+                  <div className="text-slate-600">
+                    {job.applianceType} · {job.brand}
                     {job.model ? ` · ${job.model}` : ""}
-                  </p>
-                  <p className="mt-1 font-medium text-emerald-700">{job.statusLabel}</p>
-                </div>
+                  </div>
+                  <div className="mt-1 text-emerald-700">{job.statusLabel}</div>
+                </li>
               ))}
-            </div>
+            </ul>
+          )}
+
+          {results && mobile && (
+            <p className="text-center text-xs text-slate-400">
+              Showing jobs for {formatMobileDisplay(mobile)}
+            </p>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function TrackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-slate-100 p-4">
+          <p className="text-sm text-slate-500">Loading…</p>
+        </div>
+      }
+    >
+      <TrackForm />
+    </Suspense>
   );
 }
