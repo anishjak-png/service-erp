@@ -21,15 +21,21 @@ import {
   isServiceAmountLocked,
 } from "@/lib/auth";
 import { getSession } from "@/lib/session";
+import { tenantWhere } from "@/lib/tenant";
 import { dispatchNotificationEventAsync } from "@/lib/notifications/events";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, context: RouteContext) {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const tenantFilter = tenantWhere(session);
   const { id } = await context.params;
 
   const job = await prisma.jobCard.findFirst({
-    where: { OR: [{ id }, { jobNumber: id }] },
+    where: { ...tenantFilter, OR: [{ id }, { jobNumber: id }] },
     include: {
       customer: true,
       assignedTechnician: true,
@@ -53,12 +59,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (!session.isLoggedIn || !session.role) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantFilter = tenantWhere(session);
 
     const { id } = await context.params;
     const body = await request.json();
 
     const existing = await prisma.jobCard.findFirst({
-      where: { OR: [{ id }, { jobNumber: id }] },
+      where: { ...tenantFilter, OR: [{ id }, { jobNumber: id }] },
     });
 
     if (!existing) {
@@ -169,7 +176,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           );
         }
         const partner = await prisma.outsourcePartner.findFirst({
-          where: { id: outsourcedToId, active: true },
+          where: { ...tenantFilter, id: outsourcedToId, active: true },
         });
         if (!partner) {
           return NextResponse.json(
@@ -209,8 +216,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           data.completedByOutsourceId = existing.outsourcedToId;
           data.outsourcedToId = null;
           data.outsourcedAt = null;
-          const partner = await prisma.outsourcePartner.findUnique({
-            where: { id: existing.outsourcedToId },
+          const partner = await prisma.outsourcePartner.findFirst({
+            where: { ...tenantFilter, id: existing.outsourcedToId },
           });
           statusNote =
             body.note ??
@@ -231,7 +238,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
               );
             }
             const technician = await prisma.technician.findFirst({
-              where: { id: completedById, active: true },
+              where: { ...tenantFilter, id: completedById, active: true },
             });
             if (!technician) {
               return NextResponse.json(
@@ -257,8 +264,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           data.completedByOutsourceId = existing.outsourcedToId;
           data.outsourcedToId = null;
           data.outsourcedAt = null;
-          const partner = await prisma.outsourcePartner.findUnique({
-            where: { id: existing.outsourcedToId },
+          const partner = await prisma.outsourcePartner.findFirst({
+            where: { ...tenantFilter, id: existing.outsourcedToId },
           });
           statusNote =
             body.note ??

@@ -4,6 +4,7 @@ import { MAX_PRODUCT_PHOTOS } from "@/lib/constants";
 import { parseProductPhotos } from "@/lib/jobs";
 import { getSession } from "@/lib/session";
 import { canCreateJob } from "@/lib/auth";
+import { tenantWhere } from "@/lib/tenant";
 import {
   isSupabaseStorageConfigured,
   uploadProductPhotoBuffers,
@@ -27,10 +28,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!session.isLoggedIn || !canCreateJob(session.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const tenantFilter = tenantWhere(session);
 
     const { id } = await context.params;
     const job = await prisma.jobCard.findFirst({
-      where: { OR: [{ id }, { jobNumber: id }] },
+      where: { ...tenantFilter, OR: [{ id }, { jobNumber: id }] },
       select: {
         id: true,
         jobNumber: true,

@@ -113,3 +113,10 @@ export function requireSessionTenantId(session: {
   if (!session.isLoggedIn || !session.tenantId) return null;
   return session.tenantId;
 }
+
+/** Feature flag for WhatsApp outbound/inbox (env-level kill switch). */
+export function isWhatsAppEnabled(): boolean {
+  const raw = process.env.WHATSAPP_ENABLED?.trim().toLowerCase();
+  if (raw === "0" || raw === "false" || raw === "off") return false;
+  return true;
+}

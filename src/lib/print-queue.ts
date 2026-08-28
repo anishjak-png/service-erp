@@ -61,9 +61,13 @@ export async function enqueueReceiptPrint(
   });
 }
 
-export async function getLatestPrintStatus(jobCardId: string) {
+export async function getLatestPrintStatus(jobCardId: string, tenantId?: string) {
   return prisma.printJob.findFirst({
-    where: { jobCardId, type: "receipt" },
+    where: {
+      jobCardId,
+      type: "receipt",
+      ...(tenantId ? { tenantId } : {}),
+    },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

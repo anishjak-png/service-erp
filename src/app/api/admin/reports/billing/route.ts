@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { tenantWhere } from "@/lib/tenant";
 
 type Period = "today" | "month" | "all";
 
@@ -26,23 +27,26 @@ export async function GET(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const period = (request.nextUrl.searchParams.get("period") ?? "month") as Period;
   const range = dateRange(period);
 
-  const receivedWhere = range
-    ? { receivedAt: { gte: range.start, lt: range.end } }
-    : {};
+  const receivedWhere = {
+    ...tenantFilter,
+    ...(range ? { receivedAt: { gte: range.start, lt: range.end } } : {}),
+  };
 
   const deliveredWhere = {
+    ...tenantFilter,
     status: "Delivered" as const,
     ...(range ? { deliveredAt: { gte: range.start, lt: range.end } } : {}),
   };
 
   const [received, pending, ready, delivered] = await Promise.all([
     prisma.jobCard.count({ where: receivedWhere }),
-    prisma.jobCard.count({ where: { status: "Pending" } }),
-    prisma.jobCard.count({ where: { status: "Ready" } }),
+    prisma.jobCard.count({ where: { ...tenantFilter, status: "Pending" } }),
+    prisma.jobCard.count({ where: { ...tenantFilter, status: "Ready" } }),
     prisma.jobCard.count({ where: deliveredWhere }),
   ]);
 

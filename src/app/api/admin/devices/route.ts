@@ -4,19 +4,22 @@ import { requireAdmin } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   const session = await requireAdmin();
-  if (!session) {
+  if (!session?.tenantId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const tenantId = session.tenantId;
 
   const status = request.nextUrl.searchParams.get("status");
 
   const devices = await prisma.staffDevice.findMany({
-    where:
-      status === "pending" ||
+    where: {
+      tenantId,
+      ...(status === "pending" ||
       status === "approved" ||
       status === "revoked"
         ? { status }
-        : undefined,
+        : {}),
+    },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     include: {
       staffUser: {
@@ -27,7 +30,7 @@ export async function GET(request: NextRequest) {
   });
 
   const pendingCount = await prisma.staffDevice.count({
-    where: { status: "pending" },
+    where: { tenantId, status: "pending" },
   });
 
   return NextResponse.json({

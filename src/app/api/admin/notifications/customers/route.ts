@@ -2,23 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { normalizeMobile } from "@/lib/jobs";
+import { tenantWhere } from "@/lib/tenant";
 
 export async function GET(request: NextRequest) {
   const session = await requireAdmin();
   if (!session) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
 
   const where = q
     ? {
+        ...tenantFilter,
         OR: [
           { mobile: { contains: normalizeMobile(q) } },
           { name: { contains: q, mode: "insensitive" as const } },
         ],
       }
-    : {};
+    : { ...tenantFilter };
 
   const customers = await prisma.customer.findMany({
     where,
@@ -51,6 +54,7 @@ export async function PATCH(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const body = await request.json();
   const customerId = body.customerId as string | undefined;
@@ -64,6 +68,14 @@ export async function PATCH(request: NextRequest) {
       { error: "allowWhatsappNotifications required" },
       { status: 400 }
     );
+  }
+
+  const existing = await prisma.customer.findFirst({
+    where: { ...tenantFilter, id: customerId },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Customer not found" }, { status: 404 });
   }
 
   const customer = await prisma.customer.update({

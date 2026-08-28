@@ -45,11 +45,17 @@ function agingBuckets(dates: Date[]) {
   };
 }
 
-async function buildSummary(period: ReportPeriod, start: Date, end: Date) {
+async function buildSummary(
+  period: ReportPeriod,
+  start: Date,
+  end: Date,
+  tenantId: string
+) {
+  const tenantFilter = { tenantId };
   const [cohortJobs, readyLiveJobs, returnLiveJobs, pendingLiveJobs, liveCounts] =
     await Promise.all([
       prisma.jobCard.findMany({
-        where: { receivedAt: { gte: start, lt: end } },
+        where: { ...tenantFilter, receivedAt: { gte: start, lt: end } },
         select: {
           status: true,
           serviceAmount: true,
@@ -61,21 +67,22 @@ async function buildSummary(period: ReportPeriod, start: Date, end: Date) {
         },
       }),
       prisma.jobCard.findMany({
-        where: { status: "Ready" },
+        where: { ...tenantFilter, status: "Ready" },
         select: { serviceAmount: true, readyAt: true, receivedAt: true },
       }),
       prisma.jobCard.findMany({
-        where: { status: "Return" },
+        where: { ...tenantFilter, status: "Return" },
         select: { receivedAt: true },
       }),
       prisma.jobCard.findMany({
-        where: { status: "Pending" },
+        where: { ...tenantFilter, status: "Pending" },
         select: { receivedAt: true },
       }),
       prisma.jobCard.groupBy({
         by: ["status"],
         _count: { id: true },
         where: {
+          ...tenantFilter,
           status: {
             in: [
               "Pending",
@@ -159,9 +166,15 @@ async function buildSummary(period: ReportPeriod, start: Date, end: Date) {
   };
 }
 
-async function buildTechnicianReports(period: ReportPeriod, start: Date, end: Date) {
+async function buildTechnicianReports(
+  period: ReportPeriod,
+  start: Date,
+  end: Date,
+  tenantId: string
+) {
+  const tenantFilter = { tenantId };
   const technicians = await prisma.technician.findMany({
-    where: { active: true },
+    where: { ...tenantFilter, active: true },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
@@ -172,6 +185,7 @@ async function buildTechnicianReports(period: ReportPeriod, start: Date, end: Da
         by: ["assignedTechnicianId"],
         _count: { id: true },
         where: {
+          ...tenantFilter,
           assignedTechnicianId: { not: null },
           receivedAt: { gte: start, lt: end },
         },
@@ -179,18 +193,20 @@ async function buildTechnicianReports(period: ReportPeriod, start: Date, end: Da
       prisma.jobCard.groupBy({
         by: ["assignedTechnicianId", "status"],
         _count: { id: true },
-        where: { assignedTechnicianId: { not: null } },
+        where: { ...tenantFilter, assignedTechnicianId: { not: null } },
       }),
       prisma.jobCard.groupBy({
         by: ["completedByTechnicianId"],
         _count: { id: true },
         where: {
+          ...tenantFilter,
           completedByTechnicianId: { not: null },
           readyAt: { gte: start, lt: end },
         },
       }),
       prisma.jobCard.findMany({
         where: {
+          ...tenantFilter,
           completedByTechnicianId: { not: null },
           status: "Delivered",
           deliveredAt: { gte: start, lt: end },
@@ -292,10 +308,11 @@ async function buildTechnicianReports(period: ReportPeriod, start: Date, end: Da
 async function buildBrandApplianceReports(
   period: ReportPeriod,
   start: Date,
-  end: Date
+  end: Date,
+  tenantId: string
 ) {
   const jobsInPeriod = await prisma.jobCard.findMany({
-    where: { receivedAt: { gte: start, lt: end } },
+    where: { tenantId, receivedAt: { gte: start, lt: end } },
     select: {
       serviceAmount: true,
       status: true,
@@ -336,9 +353,10 @@ async function buildBrandApplianceReports(
 
 export async function GET(request: NextRequest) {
   const session = await requireAdmin();
-  if (!session) {
+  if (!session?.tenantId) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
+  const tenantId = session.tenantId;
 
   const periodRaw = request.nextUrl.searchParams.get("period") ?? "today";
   const period: ReportPeriod = isReportPeriod(periodRaw) ? periodRaw : "today";
@@ -346,7 +364,7 @@ export async function GET(request: NextRequest) {
     "summary") as ReportSection;
   const { start, end } = getPeriodRange(period);
 
-  const cacheKey = `reports:v5:${section}:${period}`;
+  const cacheKey = `reports:v5:${tenantId}:${section}:${period}`;
   const cached = getCached<unknown>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
@@ -355,11 +373,11 @@ export async function GET(request: NextRequest) {
   let data: unknown;
 
   if (section === "technicians") {
-    data = await buildTechnicianReports(period, start, end);
+    data = await buildTechnicianReports(period, start, end, tenantId);
   } else if (section === "brands-appliances") {
-    data = await buildBrandApplianceReports(period, start, end);
+    data = await buildBrandApplianceReports(period, start, end, tenantId);
   } else {
-    data = await buildSummary(period, start, end);
+    data = await buildSummary(period, start, end, tenantId);
   }
 
   const ttl =

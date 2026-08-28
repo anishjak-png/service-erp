@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { tenantWhere } from "@/lib/tenant";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -9,6 +10,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { id } = await context.params;
   const { name } = await request.json();
@@ -17,13 +19,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Name required" }, { status: 400 });
   }
 
-  const existing = await prisma.technician.findUnique({ where: { id } });
+  const existing = await prisma.technician.findFirst({
+    where: { ...tenantFilter, id },
+  });
   if (!existing) {
     return NextResponse.json({ error: "Technician not found" }, { status: 404 });
   }
 
   const duplicate = await prisma.technician.findFirst({
-    where: { name: name.trim(), id: { not: id } },
+    where: { ...tenantFilter, name: name.trim(), id: { not: id } },
   });
   if (duplicate) {
     return NextResponse.json(
@@ -46,11 +50,20 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { id } = await context.params;
 
+  const existing = await prisma.technician.findFirst({
+    where: { ...tenantFilter, id },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Technician not found" }, { status: 404 });
+  }
+
   const activeJobs = await prisma.jobCard.count({
     where: {
+      ...tenantFilter,
       assignedTechnicianId: id,
       status: { in: ["Pending", "WaitingForCustomerApproval", "Ready", "Return"] },
     },
@@ -65,7 +78,9 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     );
   }
 
-  await prisma.applianceTechnician.deleteMany({ where: { technicianId: id } });
+  await prisma.applianceTechnician.deleteMany({
+    where: { ...tenantFilter, technicianId: id },
+  });
 
   await prisma.technician.update({
     where: { id },

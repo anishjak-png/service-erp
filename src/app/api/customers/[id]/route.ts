@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin, requireStaff } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { normalizeMobile } from "@/lib/jobs";
+import { tenantWhere } from "@/lib/tenant";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -10,11 +11,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { id } = await context.params;
 
   const customer = await prisma.customer.findFirst({
-    where: { id, ...(session.tenantId ? { tenantId: session.tenantId } : {}) },
+    where: { ...tenantFilter, id },
     include: { _count: { select: { jobCards: true } } },
   });
 
@@ -33,12 +35,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { id } = await context.params;
   const body = await request.json();
 
   const existing = await prisma.customer.findFirst({
-    where: { id, ...(session.tenantId ? { tenantId: session.tenantId } : {}) },
+    where: { ...tenantFilter, id },
   });
   if (!existing) {
     return NextResponse.json({ error: "Customer not found" }, { status: 404 });

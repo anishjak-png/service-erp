@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/session";
+import { tenantWhere } from "@/lib/tenant";
 
 export async function GET() {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const tenantFilter = tenantWhere(session);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -22,21 +30,28 @@ export async function GET() {
     applianceWise,
   ] = await Promise.all([
     prisma.jobCard.count({
-      where: { receivedAt: { gte: today, lt: tomorrow } },
+      where: { ...tenantFilter, receivedAt: { gte: today, lt: tomorrow } },
     }),
-    prisma.jobCard.count({ where: { status: "Pending" } }),
-    prisma.jobCard.count({ where: { status: "Ready" } }),
-    prisma.jobCard.count({ where: { status: "WaitingForCustomerApproval" } }),
+    prisma.jobCard.count({ where: { ...tenantFilter, status: "Pending" } }),
+    prisma.jobCard.count({ where: { ...tenantFilter, status: "Ready" } }),
     prisma.jobCard.count({
-      where: { status: "Delivered", deliveredAt: { gte: today, lt: tomorrow } },
+      where: { ...tenantFilter, status: "WaitingForCustomerApproval" },
     }),
     prisma.jobCard.count({
-      where: { receivedAt: { gte: monthStart, lt: nextMonth } },
+      where: {
+        ...tenantFilter,
+        status: "Delivered",
+        deliveredAt: { gte: today, lt: tomorrow },
+      },
+    }),
+    prisma.jobCard.count({
+      where: { ...tenantFilter, receivedAt: { gte: monthStart, lt: nextMonth } },
     }),
     prisma.jobCard.groupBy({
       by: ["assignedTechnicianId"],
       _count: { id: true },
       where: {
+        ...tenantFilter,
         status: { in: ["Pending", "WaitingForCustomerApproval", "Ready", "Return"] },
       },
     }),
@@ -44,6 +59,7 @@ export async function GET() {
       by: ["brand"],
       _count: { id: true },
       where: {
+        ...tenantFilter,
         status: { in: ["Pending", "WaitingForCustomerApproval", "Ready", "Return"] },
       },
       orderBy: { _count: { id: "desc" } },
@@ -53,6 +69,7 @@ export async function GET() {
       by: ["applianceType"],
       _count: { id: true },
       where: {
+        ...tenantFilter,
         status: { in: ["Pending", "WaitingForCustomerApproval", "Ready", "Return"] },
       },
       orderBy: { _count: { id: "desc" } },
@@ -66,7 +83,7 @@ export async function GET() {
 
   const technicians = technicianIds.length
     ? await prisma.technician.findMany({
-        where: { id: { in: technicianIds } },
+        where: { ...tenantFilter, id: { in: technicianIds } },
         select: { id: true, name: true },
       })
     : [];

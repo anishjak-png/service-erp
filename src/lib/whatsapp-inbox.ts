@@ -6,9 +6,15 @@ import { sendMetaTextMessage } from "@/lib/notifications/providers/meta/send-tex
 import { sendMetaImageMessage } from "@/lib/notifications/providers/meta/send-image-message";
 import { uploadMetaMedia } from "@/lib/notifications/providers/meta/upload-media";
 import { ACTIVE_JOB_STATUSES } from "@/lib/prisma-statuses";
-import { isWhatsAppEnabled } from "@/lib/tenant";
+import { getSession } from "@/lib/session";
+import { isWhatsAppEnabled, requireTenantId } from "@/lib/tenant";
 
 const MESSAGE_PAGE_SIZE = 50;
+
+async function currentTenantId(): Promise<string> {
+  const session = await getSession();
+  return requireTenantId(session);
+}
 
 const CHAT_MESSAGE_SELECT = {
   id: true,
@@ -119,15 +125,17 @@ function formatAutomatedLogPreview(
 }
 
 async function fetchAutomatedMessagesForMobile(
-  customerMobile: string
+  customerMobile: string,
+  tenantId: string
 ): Promise<InboxThreadMessage[]> {
   const logs = await prisma.notificationLog.findMany({
     where: {
+      tenantId,
       channel: "WHATSAPP",
       status: "Sent",
       OR: [
         { recipient: customerMobile },
-        { jobCard: { customer: { mobile: customerMobile } } },
+        { jobCard: { tenantId, customer: { tenantId, mobile: customerMobile } } },
       ],
     },
     include: {
@@ -164,7 +172,9 @@ function mergeThreadMessages(
 }
 
 export async function listWhatsAppConversations() {
+  const tenantId = await currentTenantId();
   const rows = await prisma.whatsAppConversation.findMany({
+    where: { tenantId },
     orderBy: { lastMessageAt: "desc" },
     take: 100,
     include: {
@@ -183,6 +193,7 @@ export async function listWhatsAppConversations() {
       if (row.customerId) {
         latestJob = await prisma.jobCard.findFirst({
           where: {
+            tenantId,
             customerId: row.customerId,
             status: { in: ACTIVE_JOB_STATUSES },
           },
@@ -214,8 +225,9 @@ export async function getWhatsAppMessages(
   conversationId: string,
   page = 1
 ) {
-  const conversation = await prisma.whatsAppConversation.findUnique({
-    where: { id: conversationId },
+  const tenantId = await currentTenantId();
+  const conversation = await prisma.whatsAppConversation.findFirst({
+    where: { id: conversationId, tenantId },
     include: {
       customer: { select: { id: true, name: true, mobile: true } },
     },
@@ -227,8 +239,8 @@ export async function getWhatsAppMessages(
 
   const [chatRows, chatTotal, automatedMessages] = await Promise.all([
     fetchChatMessages(conversationId, skip, MESSAGE_PAGE_SIZE),
-    prisma.whatsAppMessage.count({ where: { conversationId } }),
-    fetchAutomatedMessagesForMobile(conversation.customerMobile),
+    prisma.whatsAppMessage.count({ where: { conversationId, tenantId } }),
+    fetchAutomatedMessagesForMobile(conversation.customerMobile, tenantId),
   ]);
 
   const chatMessages: InboxThreadMessage[] = chatRows.map((m) => ({
@@ -260,6 +272,7 @@ export async function getWhatsAppMessages(
   if (conversation.customerId) {
     latestJob = await prisma.jobCard.findFirst({
       where: {
+        tenantId,
         customerId: conversation.customerId,
         status: { in: ACTIVE_JOB_STATUSES },
       },
@@ -286,8 +299,9 @@ export async function getWhatsAppMessages(
 }
 
 export async function markWhatsAppConversationRead(conversationId: string) {
+  const tenantId = await currentTenantId();
   const updated = await prisma.whatsAppConversation.updateMany({
-    where: { id: conversationId },
+    where: { id: conversationId, tenantId },
     data: { unreadCount: 0 },
   });
   return updated.count > 0;
@@ -302,8 +316,9 @@ export async function sendWhatsAppReply(params: {
     return { ok: false as const, error: "WhatsApp disabled" };
   }
 
-  const conversation = await prisma.whatsAppConversation.findUnique({
-    where: { id: params.conversationId },
+  const tenantId = await currentTenantId();
+  const conversation = await prisma.whatsAppConversation.findFirst({
+    where: { id: params.conversationId, tenantId },
     include: {
       customer: { select: { id: true } },
     },
@@ -318,7 +333,7 @@ export async function sendWhatsAppReply(params: {
     return { ok: false as const, error: "Message body is empty" };
   }
 
-  const settings = await getNotificationSettings();
+  const settings = await getNotificationSettings(tenantId);
   if (settings.provider !== "meta") {
     return {
       ok: false as const,
@@ -343,6 +358,7 @@ export async function sendWhatsAppReply(params: {
     ? (
         await prisma.jobCard.findFirst({
           where: {
+            tenantId,
             customerId: conversation.customerId,
             status: { in: ACTIVE_JOB_STATUSES },
           },
@@ -366,6 +382,7 @@ export async function sendWhatsAppReply(params: {
 
     return tx.whatsAppMessage.create({
       data: {
+        tenantId,
         conversationId: conversation.id,
         direction: "outbound",
         wamid: result.externalId!,
@@ -412,8 +429,9 @@ export async function sendWhatsAppImageReply(params: {
     return { ok: false as const, error: "WhatsApp disabled" };
   }
 
-  const conversation = await prisma.whatsAppConversation.findUnique({
-    where: { id: params.conversationId },
+  const tenantId = await currentTenantId();
+  const conversation = await prisma.whatsAppConversation.findFirst({
+    where: { id: params.conversationId, tenantId },
     include: {
       customer: { select: { id: true } },
     },
@@ -432,7 +450,7 @@ export async function sendWhatsAppImageReply(params: {
     return { ok: false as const, error: "Image must be 5 MB or smaller" };
   }
 
-  const settings = await getNotificationSettings();
+  const settings = await getNotificationSettings(tenantId);
   if (settings.provider !== "meta") {
     return {
       ok: false as const,
@@ -471,6 +489,7 @@ export async function sendWhatsAppImageReply(params: {
     ? (
         await prisma.jobCard.findFirst({
           where: {
+            tenantId,
             customerId: conversation.customerId,
             status: { in: ACTIVE_JOB_STATUSES },
           },
@@ -494,6 +513,7 @@ export async function sendWhatsAppImageReply(params: {
 
     return tx.whatsAppMessage.create({
       data: {
+        tenantId,
         conversationId: conversation.id,
         direction: "outbound",
         wamid: result.externalId!,

@@ -20,13 +20,22 @@ export async function GET() {
     return NextResponse.json({ isLoggedIn: false });
   }
 
+  if (session.tenantId && staffUser.tenantId !== session.tenantId) {
+    await clearSession(session);
+    return NextResponse.json({ isLoggedIn: false });
+  }
+
+  if (!session.tenantId) {
+    session.tenantId = staffUser.tenantId;
+    await session.save();
+  }
+
   if (session.deviceId) {
-    const device = await prisma.staffDevice.findUnique({
+    const device = await prisma.staffDevice.findFirst({
       where: {
-        staffUserId_deviceId: {
-          staffUserId: session.staffUserId,
-          deviceId: session.deviceId,
-        },
+        tenantId: staffUser.tenantId,
+        staffUserId: session.staffUserId,
+        deviceId: session.deviceId,
       },
     });
 
@@ -53,6 +62,7 @@ export async function GET() {
     role: session.role,
     staffName: staffUser.name,
     staffUserId: staffUser.id,
+    tenantId: staffUser.tenantId,
     deviceStatus: session.deviceStatus ?? "pending",
     deviceApproved: isDeviceApproved(session),
     technicianId: session.technicianId ?? staffUser.technicianId,
@@ -61,7 +71,7 @@ export async function GET() {
   };
 
   if (session.role === "admin" && isDeviceApproved(session)) {
-    payload.pendingDeviceCount = await countPendingDevices();
+    payload.pendingDeviceCount = await countPendingDevices(staffUser.tenantId);
   }
 
   return NextResponse.json(payload);

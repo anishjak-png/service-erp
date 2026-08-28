@@ -8,6 +8,7 @@ import {
 } from "@/lib/delivery-contact";
 import { staffActorName } from "@/lib/jobs";
 import { getSession } from "@/lib/session";
+import { tenantWhere } from "@/lib/tenant";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!session.isLoggedIn || !session.role) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const tenantFilter = tenantWhere(session);
 
   if (
     session.role !== "reception" &&
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   const existing = await prisma.jobCard.findFirst({
-    where: { OR: [{ id }, { jobNumber: id }] },
+    where: { ...tenantFilter, OR: [{ id }, { jobNumber: id }] },
     select: { id: true, status: true, jobNumber: true },
   });
 

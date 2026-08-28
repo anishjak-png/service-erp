@@ -6,6 +6,7 @@ import {
   sendWhatsAppNotification,
 } from "@/lib/notifications/whatsapp-service";
 import { prisma } from "@/lib/db";
+import { tenantWhere } from "@/lib/tenant";
 import type { NotificationEventType } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -15,12 +16,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { id } = await context.params;
   const body = await request.json().catch(() => ({}));
 
   const job = await prisma.jobCard.findFirst({
-    where: { OR: [{ id }, { jobNumber: id }] },
+    where: { ...tenantFilter, OR: [{ id }, { jobNumber: id }] },
     select: { id: true, status: true },
   });
 

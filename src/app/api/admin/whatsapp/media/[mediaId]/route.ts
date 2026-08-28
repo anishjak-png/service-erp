@@ -6,6 +6,7 @@ import {
   fetchMetaMediaMetadata,
 } from "@/lib/notifications/providers/meta/fetch-media";
 import { getNotificationSettings } from "@/lib/notifications/settings-store";
+import { tenantWhere } from "@/lib/tenant";
 
 type RouteContext = { params: Promise<{ mediaId: string }> };
 
@@ -14,6 +15,7 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { mediaId } = await context.params;
   if (!mediaId?.trim()) {
@@ -21,14 +23,14 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const known = await prisma.whatsAppMessage.findFirst({
-    where: { mediaId },
+    where: { ...tenantFilter, mediaId },
     select: { id: true },
   });
   if (!known) {
     return NextResponse.json({ error: "Media not found" }, { status: 404 });
   }
 
-  const settings = await getNotificationSettings();
+  const settings = await getNotificationSettings(session.tenantId!);
   if (settings.provider !== "meta") {
     return NextResponse.json(
       { error: "Meta Cloud API not configured" },

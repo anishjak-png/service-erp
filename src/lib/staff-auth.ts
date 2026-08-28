@@ -10,8 +10,13 @@ export async function countApprovedDevices(tenantId?: string): Promise<number> {
   });
 }
 
-export async function countPendingDevices(): Promise<number> {
-  return prisma.staffDevice.count({ where: { status: "pending" } });
+export async function countPendingDevices(tenantId?: string): Promise<number> {
+  return prisma.staffDevice.count({
+    where: {
+      status: "pending",
+      ...(tenantId ? { tenantId } : {}),
+    },
+  });
 }
 
 /** Non-admin users may only have one approved device at a time. */

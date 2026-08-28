@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { tenantWhere } from "@/lib/tenant";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -9,11 +10,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { id } = await context.params;
   const body = await request.json();
 
-  const existing = await prisma.outsourcePartner.findUnique({ where: { id } });
+  const existing = await prisma.outsourcePartner.findFirst({
+    where: { ...tenantFilter, id },
+  });
   if (!existing) {
     return NextResponse.json({ error: "Partner not found" }, { status: 404 });
   }
@@ -26,7 +30,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Name required" }, { status: 400 });
     }
     const conflict = await prisma.outsourcePartner.findFirst({
-      where: { name, NOT: { id } },
+      where: { ...tenantFilter, name, NOT: { id } },
     });
     if (conflict) {
       return NextResponse.json({ error: "Name already in use" }, { status: 409 });

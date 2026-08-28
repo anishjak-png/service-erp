@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { tenantWhere } from "@/lib/tenant";
 
 export async function GET() {
   const session = await getSession();
@@ -8,8 +9,12 @@ export async function GET() {
   if (!session.isLoggedIn || session.role !== "technician" || !session.technicianId) {
     return NextResponse.json({ error: "Technician only" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
-  const assigned = { assignedTechnicianId: session.technicianId };
+  const assigned = {
+    ...tenantFilter,
+    assignedTechnicianId: session.technicianId,
+  };
 
   const [
     receivedTotal,

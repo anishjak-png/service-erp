@@ -2,23 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { normalizeMobile } from "@/lib/jobs";
+import { tenantWhere } from "@/lib/tenant";
 
 export async function GET(request: NextRequest) {
   const session = await requireAdmin();
   if (!session) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
 
   const where = q
     ? {
+        ...tenantFilter,
         OR: [
           { mobile: { contains: normalizeMobile(q) } },
           { name: { contains: q } },
         ],
       }
-    : {};
+    : { ...tenantFilter };
 
   const customers = await prisma.customer.findMany({
     where,

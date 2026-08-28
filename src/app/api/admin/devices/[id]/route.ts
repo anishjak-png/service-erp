@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { revokeOtherApprovedDevices } from "@/lib/staff-auth";
+import { tenantWhere } from "@/lib/tenant";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -10,6 +11,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!session || !session.staffUserId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { id } = await context.params;
   const body = await request.json();
@@ -22,8 +24,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const device = await prisma.staffDevice.findUnique({
-    where: { id },
+  const device = await prisma.staffDevice.findFirst({
+    where: { ...tenantFilter, id },
     include: {
       staffUser: { select: { id: true, name: true, mobile: true, role: true } },
     },

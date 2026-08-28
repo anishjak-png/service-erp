@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { hashPassword, isValidMobile, normalizeMobile } from "@/lib/password";
+import { tenantWhere } from "@/lib/tenant";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -10,11 +11,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const tenantFilter = tenantWhere(session);
 
   const { id } = await context.params;
   const body = await request.json();
 
-  const existing = await prisma.staffUser.findUnique({ where: { id } });
+  const existing = await prisma.staffUser.findFirst({
+    where: { ...tenantFilter, id },
+  });
   if (!existing) {
     return NextResponse.json({ error: "Staff user not found" }, { status: 404 });
   }
@@ -42,7 +46,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     const mobile = normalizeMobile(body.mobile);
     const conflict = await prisma.staffUser.findFirst({
-      where: { mobile, NOT: { id } },
+      where: { ...tenantFilter, mobile, NOT: { id } },
     });
     if (conflict) {
       return NextResponse.json(
@@ -90,14 +94,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (technicianId) {
-      const tech = await prisma.technician.findUnique({
-        where: { id: technicianId },
+      const tech = await prisma.technician.findFirst({
+        where: { ...tenantFilter, id: technicianId },
       });
       if (!tech) {
         return NextResponse.json({ error: "Technician not found" }, { status: 404 });
       }
       const conflict = await prisma.staffUser.findFirst({
         where: {
+          ...tenantFilter,
           technicianId,
           active: true,
           NOT: { id },

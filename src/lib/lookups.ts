@@ -371,7 +371,10 @@ export async function updateApplianceOption(id: string, newValue: string) {
   const trimmed = newValue.trim();
   if (!trimmed) return { error: "Value required" as const };
 
-  const existing = await prisma.lookupOption.findUnique({ where: { id } });
+  const tid = await currentTenantId();
+  const existing = await prisma.lookupOption.findFirst({
+    where: { id, tenantId: tid },
+  });
   if (!existing || existing.category !== "appliance") {
     return { error: "Appliance not found" as const };
   }
@@ -380,7 +383,6 @@ export async function updateApplianceOption(id: string, newValue: string) {
     return { option: existing };
   }
 
-  const tid = existing.tenantId;
   const duplicate = await prisma.lookupOption.findUnique({
     where: {
       tenantId_category_value: {
@@ -447,12 +449,14 @@ export async function updateApplianceOption(id: string, newValue: string) {
 }
 
 export async function deleteApplianceOption(id: string) {
-  const existing = await prisma.lookupOption.findUnique({ where: { id } });
+  const tid = await currentTenantId();
+  const existing = await prisma.lookupOption.findFirst({
+    where: { id, tenantId: tid },
+  });
   if (!existing || existing.category !== "appliance") {
     return { error: "Appliance not found" as const };
   }
 
-  const tid = existing.tenantId;
   const activeJobs = await prisma.jobCard.count({
     where: {
       tenantId: tid,
