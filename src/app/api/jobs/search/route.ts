@@ -16,6 +16,7 @@ import {
   type ReportPeriod,
 } from "@/lib/reports";
 import { getSession } from "@/lib/session";
+import { requireTenantId, tenantWhere } from "@/lib/tenant";
 
 function technicianScopeWhere(
   session: Awaited<ReturnType<typeof getSession>>,
@@ -107,7 +108,8 @@ async function browseJobsResponse(params: {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const where: Record<string, unknown> = { ...scopeWhere };
+  const tenantFilter = tenantWhere(session);
+  const where: Record<string, unknown> = { ...tenantFilter, ...scopeWhere };
 
   if (pipeline) {
     const statuses = PIPELINE_STATUSES[pipeline].filter((s) => {
@@ -276,6 +278,7 @@ export async function GET(request: NextRequest) {
 
 async function searchJobs(request: NextRequest) {
   const session = await getSession();
+  const tenantFilter = tenantWhere(session);
   const { searchParams } = request.nextUrl;
   const q = searchParams.get("q")?.trim() ?? "";
   const customerId = searchParams.get("customerId");
@@ -357,6 +360,7 @@ async function searchJobs(request: NextRequest) {
   async function jobsForCustomer(id: string) {
     return prisma.jobCard.findMany({
       where: {
+        ...tenantFilter,
         customerId: id,
         ...scopeWhere,
         ...statusWhere,
@@ -370,7 +374,7 @@ async function searchJobs(request: NextRequest) {
 
   async function totalVisitsForCustomer(id: string) {
     return prisma.jobCard.count({
-      where: { customerId: id, ...scopeWhere },
+      where: { ...tenantFilter, customerId: id, ...scopeWhere },
     });
   }
 
@@ -396,8 +400,8 @@ async function searchJobs(request: NextRequest) {
   }
 
   if (customerId) {
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, ...tenantFilter },
       select: { id: true, name: true, mobile: true },
     });
     if (!customer) {
@@ -425,7 +429,12 @@ async function searchJobs(request: NextRequest) {
   if (searchType === "mobile") {
     const mobile = normalizeMobile(q);
     const customer = await prisma.customer.findUnique({
-      where: { mobile },
+      where: {
+        tenantId_mobile: {
+          tenantId: requireTenantId(session),
+          mobile,
+        },
+      },
       select: { id: true, name: true, mobile: true },
     });
     if (!customer) {
@@ -443,6 +452,7 @@ async function searchJobs(request: NextRequest) {
     const jobNumber = normalizeJobNumberQuery(q);
     const job = await prisma.jobCard.findFirst({
       where: {
+        ...tenantFilter,
         jobNumber,
         ...scopeWhere,
         ...statusWhere,
@@ -466,7 +476,10 @@ async function searchJobs(request: NextRequest) {
   }
 
   const customers = await prisma.customer.findMany({
-    where: { name: { contains: q, mode: "insensitive" } },
+    where: {
+      ...tenantFilter,
+      name: { contains: q, mode: "insensitive" },
+    },
     select: {
       id: true,
       name: true,

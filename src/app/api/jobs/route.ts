@@ -21,6 +21,7 @@ import {
 import { runPostJobCreateTasks } from "@/lib/job-create-background";
 import { canCreateJob } from "@/lib/auth";
 import { getSession } from "@/lib/session";
+import { requireTenantId, tenantWhere } from "@/lib/tenant";
 import { ACTIVE_JOB_STATUSES, TECH_MY_BOARD_STATUSES, WARRANTY_JOB_STATUSES, warrantyFieldsSupported } from "@/lib/prisma-statuses";
 import { MAX_PRODUCT_PHOTOS, MAX_WARRANTY_CARD_PHOTOS } from "@/lib/constants";
 import { getJobListSelect } from "@/lib/job-selects";
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
 
 async function listJobs(request: NextRequest) {
   const session = await getSession();
+  const tenantFilter = tenantWhere(session);
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() ?? "";
   const status = searchParams.get("status");
@@ -53,7 +55,7 @@ async function listJobs(request: NextRequest) {
   const warrantyBrand = searchParams.get("warrantyBrand")?.trim() ?? "";
   const warrantyOnly = searchParams.get("warranty") === "true";
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { ...tenantFilter };
 
   const isTechnicianMyScope =
     session.isLoggedIn &&
@@ -73,10 +75,15 @@ async function listJobs(request: NextRequest) {
     if (searchType === "ut") {
       where.jobNumber = normalizeJobNumberQuery(q);
     } else if (searchType === "mobile") {
-      where.customer = { mobile: normalizeMobile(q) };
+      where.customer = { ...tenantFilter, mobile: normalizeMobile(q) };
     } else {
       where.OR = [
-        { customer: { name: { contains: q, mode: "insensitive" } } },
+        {
+          customer: {
+            ...tenantFilter,
+            name: { contains: q, mode: "insensitive" },
+          },
+        },
       ];
     }
   }
@@ -192,6 +199,7 @@ async function createJob(request: NextRequest) {
   if (!session.isLoggedIn || !canCreateJob(session.role)) {
     return NextResponse.json({ error: "Not allowed to create jobs" }, { status: 403 });
   }
+  const tenantId = requireTenantId(session);
 
   const contentType = request.headers.get("content-type") ?? "";
   let mobile = "";
@@ -278,8 +286,8 @@ async function createJob(request: NextRequest) {
   }
 
   const [brandAllowed, complaintAllowed] = await Promise.all([
-    isBrandAllowedForAppliance(applianceType, brand),
-    isComplaintAllowedForAppliance(applianceType, complaint),
+    isBrandAllowedForAppliance(applianceType, brand, tenantId),
+    isComplaintAllowedForAppliance(applianceType, complaint, tenantId),
   ]);
 
   if (!brandAllowed) {
@@ -299,7 +307,8 @@ async function createJob(request: NextRequest) {
   if (accessoriesList.length > 0) {
     const accessoriesValid = await validateAccessoriesForAppliance(
       applianceType,
-      accessoryNames(accessoriesList)
+      accessoryNames(accessoriesList),
+      tenantId
     );
     if (!accessoriesValid) {
       return NextResponse.json(
@@ -352,21 +361,31 @@ async function createJob(request: NextRequest) {
   const creatorName = staffActorName(session);
   const brandName = brand.trim();
 
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { jobPrefix: true },
+  });
+
   const [customer, jobNumber, defaultTech] = await Promise.all([
     prisma.customer.upsert({
-      where: { mobile: normalizedMobile },
+      where: {
+        tenantId_mobile: { tenantId, mobile: normalizedMobile },
+      },
       update: {
         name: customerName.trim(),
         allowWhatsappNotifications,
       },
       create: {
+        tenantId,
         mobile: normalizedMobile,
         name: customerName.trim(),
         allowWhatsappNotifications,
       },
     }),
-    generateJobNumber(),
-    isWarranty ? Promise.resolve(null) : getDefaultTechnicianForAppliance(applianceType),
+    generateJobNumber(tenantId, tenant?.jobPrefix),
+    isWarranty
+      ? Promise.resolve(null)
+      : getDefaultTechnicianForAppliance(applianceType, tenantId),
   ]);
 
   const assignedTechnicianId = isWarranty ? null : defaultTech?.id ?? null;
@@ -388,14 +407,16 @@ async function createJob(request: NextRequest) {
       if (photoFiles.length > 0) {
         const urls = await uploadProductPhotoBuffers(
           await readPhotoBuffers(photoFiles),
-          jobNumber
+          jobNumber,
+          tenantId
         );
         productPhotosJson = JSON.stringify(urls);
       }
       if (warrantyCardPhotoFiles.length > 0) {
         const urls = await uploadWarrantyCardPhotoBuffers(
           await readPhotoBuffers(warrantyCardPhotoFiles),
-          jobNumber
+          jobNumber,
+          tenantId
         );
         warrantyCardPhotosJson = JSON.stringify(urls);
       }
@@ -409,6 +430,7 @@ async function createJob(request: NextRequest) {
 
   const job = await prisma.jobCard.create({
     data: {
+      tenantId,
       jobNumber,
       customerId: customer.id,
       applianceType,

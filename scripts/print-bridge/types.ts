@@ -1,5 +1,6 @@
 export type PrintJobRow = {
   id: string;
+  tenantId?: string | null;
   jobCardId: string | null;
   type: string;
   payload?: unknown;

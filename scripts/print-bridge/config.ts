@@ -5,6 +5,8 @@ export type BridgeConfig = {
   supabaseServiceRoleKey: string;
   branchId: string;
   printerId: string;
+  /** Optional: only process PrintJob rows for this tenant (multi-tenant). */
+  tenantId: string;
   printerIp: string;
   printerPort: number;
   printerName: string;
@@ -59,6 +61,7 @@ export function loadConfig(): BridgeConfig {
     supabaseServiceRoleKey,
     branchId,
     printerId,
+    tenantId: envFirst("TENANT_ID", "PRINT_TENANT_ID"),
     printerIp,
     printerPort,
     printerName,
@@ -67,8 +70,8 @@ export function loadConfig(): BridgeConfig {
     appUrl:
       process.env.NEXT_PUBLIC_APP_URL?.trim() ||
       process.env.PRINT_AGENT_APP_URL?.trim() ||
-      "https://uma-service.vercel.app",
-    shopName: process.env.NEXT_PUBLIC_SHOP_NAME?.trim() || "Uma Traders",
+      "https://service-erp.vercel.app",
+    shopName: process.env.NEXT_PUBLIC_SHOP_NAME?.trim() || "Your Shop",
     shopPhone: process.env.NEXT_PUBLIC_SHOP_PHONE?.trim() || "",
   };
 }

@@ -4,7 +4,7 @@ import type { NotificationEventType } from "@prisma/client";
 export const DEFAULT_TEMPLATE_BODIES: Record<NotificationEventType, string> = {
   JOB_CREATED: `Dear {{customer_name}},
 
-Your product has been received by UMA SERVICE.
+Your product has been received for service.
 
 Job Card Number : {{job_number}}
 
@@ -28,7 +28,7 @@ Job Card Number : {{job_number}}
 
 Service Charges : {{service_amount}}
 
-Please collect your product from UMA Traders.
+Please collect your product from the service centre.
 
 Thank you.`,
 
@@ -38,7 +38,7 @@ We regret to inform you that your product could not be repaired / serviced.
 
 Job Card Number : {{job_number}}
 
-Kindly collect your product from UMA Traders.
+Kindly collect your product from Service ERP.
 
 Thank you.`,
 };

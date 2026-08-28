@@ -6,6 +6,7 @@ import { sendMetaTextMessage } from "@/lib/notifications/providers/meta/send-tex
 import { sendMetaImageMessage } from "@/lib/notifications/providers/meta/send-image-message";
 import { uploadMetaMedia } from "@/lib/notifications/providers/meta/upload-media";
 import { ACTIVE_JOB_STATUSES } from "@/lib/prisma-statuses";
+import { isWhatsAppEnabled } from "@/lib/tenant";
 
 const MESSAGE_PAGE_SIZE = 50;
 
@@ -297,6 +298,10 @@ export async function sendWhatsAppReply(params: {
   body: string;
   staffUserId: string;
 }) {
+  if (!isWhatsAppEnabled()) {
+    return { ok: false as const, error: "WhatsApp disabled" };
+  }
+
   const conversation = await prisma.whatsAppConversation.findUnique({
     where: { id: params.conversationId },
     include: {
@@ -403,6 +408,10 @@ export async function sendWhatsAppImageReply(params: {
   caption?: string;
   staffUserId: string;
 }) {
+  if (!isWhatsAppEnabled()) {
+    return { ok: false as const, error: "WhatsApp disabled" };
+  }
+
   const conversation = await prisma.whatsAppConversation.findUnique({
     where: { id: params.conversationId },
     include: {

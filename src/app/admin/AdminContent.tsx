@@ -14,8 +14,7 @@ import { WhatsAppInboxTab } from "./WhatsAppInboxTab";
 import { StaffTab } from "./StaffTab";
 import { DevicesTab } from "./DevicesTab";
 import { OutsourceTab } from "./OutsourceTab";
-import { SparePartsTab } from "@/modules/spare-parts/components/SparePartsTab";
-import { isSparePartsEnabled } from "@/modules/spare-parts/enabled";
+import { ShopSettingsTab } from "./ShopSettingsTab";
 import { reportJobsHref } from "@/lib/report-links";
 import { periodLabel, type ReportPeriod } from "@/lib/reports";
 
@@ -58,14 +57,14 @@ export default function AdminContent() {
   const initialTab: AdminTab =
     tabFromUrl === "reports" ||
     tabFromUrl === "devices" ||
+    tabFromUrl === "shop" ||
     tabFromUrl === "staff" ||
     tabFromUrl === "outsource" ||
     tabFromUrl === "technicians" ||
     tabFromUrl === "appliances" ||
     tabFromUrl === "customers" ||
     tabFromUrl === "inbox" ||
-    tabFromUrl === "whatsapp" ||
-    tabFromUrl === "spare-parts"
+    tabFromUrl === "whatsapp"
       ? tabFromUrl
       : "devices";
 
@@ -91,6 +90,7 @@ export default function AdminContent() {
     const requested = searchParams.get("tab");
     if (
       requested === "devices" ||
+      requested === "shop" ||
       requested === "staff" ||
       requested === "outsource" ||
       requested === "technicians" ||
@@ -98,7 +98,6 @@ export default function AdminContent() {
       requested === "customers" ||
       requested === "inbox" ||
       requested === "whatsapp" ||
-      requested === "spare-parts" ||
       requested === "reports"
     ) {
       setTab(requested);
@@ -144,6 +143,7 @@ export default function AdminContent() {
         />
       )}
       {tab === "devices" && <DevicesTab />}
+      {tab === "shop" && <ShopSettingsTab />}
       {tab === "staff" && <StaffTab />}
       {tab === "outsource" && <OutsourceTab />}
       {tab === "technicians" && <TechniciansTab />}
@@ -153,7 +153,6 @@ export default function AdminContent() {
         <WhatsAppInboxTab onUnreadChange={setInboxUnreadCount} />
       )}
       {tab === "whatsapp" && <WhatsAppAutomationTab />}
-      {tab === "spare-parts" && isSparePartsEnabled() && <SparePartsTab />}
       {tab === "reports" && <ReportsTab />}
     </AppShell>
   );

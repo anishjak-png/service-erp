@@ -24,7 +24,8 @@ async function uploadPhotoBuffersToFolder(
   photos: PhotoBufferPayload[],
   jobNumber: string,
   folder: string,
-  maxPhotos: number
+  maxPhotos: number,
+  tenantId?: string
 ): Promise<string[]> {
   const { url, key, bucket } = getStorageConfig();
   const urls: string[] = [];
@@ -32,7 +33,8 @@ async function uploadPhotoBuffersToFolder(
   for (const photo of photos.slice(0, maxPhotos)) {
     const ext = photo.name.split(".").pop()?.toLowerCase() || "jpg";
     const safeJobNumber = jobNumber.replace(/\s+/g, "-");
-    const path = `${safeJobNumber}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const tenantPrefix = tenantId ? `${tenantId}/` : "";
+    const path = `${tenantPrefix}${safeJobNumber}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     const res = await fetch(`${url}/storage/v1/object/${bucket}/${path}`, {
       method: "POST",
@@ -80,26 +82,30 @@ async function uploadPhotoBuffersToFolder(
 
 export async function uploadProductPhotoBuffers(
   photos: PhotoBufferPayload[],
-  jobNumber: string
+  jobNumber: string,
+  tenantId?: string
 ): Promise<string[]> {
-  return uploadPhotoBuffersToFolder(photos, jobNumber, "product", MAX_PHOTOS);
+  return uploadPhotoBuffersToFolder(photos, jobNumber, "product", MAX_PHOTOS, tenantId);
 }
 
 export async function uploadWarrantyCardPhotoBuffers(
   photos: PhotoBufferPayload[],
-  jobNumber: string
+  jobNumber: string,
+  tenantId?: string
 ): Promise<string[]> {
   return uploadPhotoBuffersToFolder(
     photos,
     jobNumber,
     "warranty-card",
-    MAX_WARRANTY_CARD_PHOTOS
+    MAX_WARRANTY_CARD_PHOTOS,
+    tenantId
   );
 }
 
 export async function uploadProductPhotos(
   files: File[],
-  jobNumber: string
+  jobNumber: string,
+  tenantId?: string
 ): Promise<string[]> {
   const photos = await Promise.all(
     files.slice(0, MAX_PHOTOS).map(async (file) => ({
@@ -108,7 +114,7 @@ export async function uploadProductPhotos(
       name: file.name,
     }))
   );
-  return uploadProductPhotoBuffers(photos, jobNumber);
+  return uploadProductPhotoBuffers(photos, jobNumber, tenantId);
 }
 
 export function isSupabaseStorageConfigured(): boolean {

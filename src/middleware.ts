@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, isDeviceApproved } from "@/lib/session";
+import { resolveTenantSlugFromRequest } from "@/lib/tenant";
 
-const publicPaths = ["/", "/j", "/track", "/api/auth/login", "/device-pending", "/api/webhooks/whatsapp"];
+const publicPaths = [
+  "/",
+  "/j",
+  "/track",
+  "/signup",
+  "/api/auth/login",
+  "/api/auth/signup",
+  "/device-pending",
+  "/api/webhooks/whatsapp",
+];
 const publicPrefixes = ["/j/", "/api/track"];
 
 function isPublic(pathname: string): boolean {
@@ -21,9 +31,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const tenantSlug = resolveTenantSlugFromRequest({
+    host: request.headers.get("host"),
+    searchParams: request.nextUrl.searchParams,
+    headerSlug: request.headers.get("x-tenant-slug"),
+  });
+
+  const requestHeaders = new Headers(request.headers);
+  if (tenantSlug) {
+    requestHeaders.set("x-tenant-slug", tenantSlug);
+  }
+
   const session = await getSession();
 
   if (pathname === "/" && session.isLoggedIn) {
+    if (!session.tenantId) {
+      return NextResponse.redirect(new URL("/?reauth=1", request.url));
+    }
     if (!isDeviceApproved(session)) {
       return NextResponse.redirect(new URL("/device-pending", request.url));
     }
@@ -35,7 +59,9 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPublic(pathname)) {
-    return NextResponse.next();
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
   }
 
   if (!session.isLoggedIn) {
@@ -43,6 +69,16 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  if (!session.tenantId) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Tenant context required — please sign in again" },
+        { status: 401 }
+      );
+    }
+    return NextResponse.redirect(new URL("/?reauth=1", request.url));
   }
 
   if (!isDeviceApproved(session)) {
@@ -63,20 +99,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (
-    pathname.startsWith("/spare-parts") ||
-    pathname.startsWith("/api/spare-parts")
-  ) {
-    if (session.role !== "admin") {
-      if (pathname.startsWith("/api/")) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      const home =
-        session.role === "technician" ? "/jobs/pending?scope=my" : "/dashboard";
-      return NextResponse.redirect(new URL(home, request.url));
-    }
-  }
-
   if (session.role === "technician") {
     const blocked =
       pathname.startsWith("/admin") ||
@@ -86,7 +108,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 }
 
 export const config = {

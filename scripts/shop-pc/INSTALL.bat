@@ -1,5 +1,5 @@
 @echo off
-title Uma Traders Print Bridge - Install
+title Service ERP Print Bridge - Install
 cd /d "%~dp0"
 echo.
 echo  This will install the print bridge and start it on every login.

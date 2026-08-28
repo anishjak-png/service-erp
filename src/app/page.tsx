@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { SHOP_NAME } from "@/lib/constants";
+import Link from "next/link";
+import { APP_NAME } from "@/lib/constants";
 import { useAuth } from "@/components/AuthProvider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { getDeviceIdentity } from "@/lib/device-identity";
 import {
@@ -15,11 +16,18 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tenantFromUrl = searchParams.get("tenant")?.trim() ?? "";
   const { refreshAuth, isLoggedIn, deviceApproved, role, loaded } = useAuth();
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
+  const [tenantSlug, setTenantSlug] = useState(tenantFromUrl);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (tenantFromUrl) setTenantSlug(tenantFromUrl);
+  }, [tenantFromUrl]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -47,6 +55,7 @@ export default function LoginPage() {
         deviceId: identity.deviceId,
         deviceLabel: identity.deviceLabel,
         platform: identity.platform,
+        tenantSlug: tenantSlug.trim() || undefined,
       }),
     });
 
@@ -94,11 +103,28 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-emerald-800">{SHOP_NAME}</CardTitle>
-          <p className="text-sm text-slate-500">Job Card System</p>
+          <CardTitle className="text-2xl text-emerald-800">{APP_NAME}</CardTitle>
+          <p className="text-sm text-slate-500">Multi-tenant service job cards</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="tenantSlug"
+                className="text-sm font-medium text-slate-700"
+              >
+                Shop slug (optional if unique mobile)
+              </label>
+              <input
+                id="tenantSlug"
+                type="text"
+                value={tenantSlug}
+                onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
+                placeholder="e.g. demo"
+                className="flex h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              />
+            </div>
+
             <div className="space-y-2">
               <label
                 htmlFor="mobile"
@@ -151,6 +177,11 @@ export default function LoginPage() {
 
           <p className="mt-4 text-center text-xs text-slate-400">
             New device? Admin must approve after first login.
+          </p>
+          <p className="mt-3 text-center text-sm">
+            <Link href="/signup" className="font-medium text-emerald-700 hover:underline">
+              New shop? Create an account
+            </Link>
           </p>
           <p className="mt-3 text-center text-sm">
             <Link href="/track" className="font-medium text-emerald-700 hover:underline">

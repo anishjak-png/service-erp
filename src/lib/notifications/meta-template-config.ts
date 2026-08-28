@@ -30,11 +30,11 @@ export type MetaTemplateDefinition = {
 };
 
 /**
- * Single source of truth for Meta approved production templates.
- * uma_job_created       → 3 body variables: Customer Name, Product, Job Number
- * uma_job_created_link  → 4 body variables: Customer Name, Product, Job Number, Tracking Link
- * uma_ready             → 4 body variables: Customer Name, Product, Job Number, Service Amount
- * uma_return            → 3 body variables: Customer Name, Product, Job Number
+ * Meta approved template names for Service ERP (configure per WABA later).
+ * se_job_created       → 3 body variables: Customer Name, Product, Job Number
+ * se_job_created_link  → 4 body variables: Customer Name, Product, Job Number, Tracking Link
+ * se_ready             → 4 body variables: Customer Name, Product, Job Number, Service Amount
+ * se_return            → 3 body variables: Customer Name, Product, Job Number
  *
  * Test Connection uses Meta's built-in hello_world — not listed here.
  */
@@ -43,7 +43,7 @@ export const META_TEMPLATES: Record<
   MetaTemplateDefinition
 > = {
   JOB_READY: {
-    name: "uma_ready",
+    name: "se_ready",
     eventType: "JOB_READY",
     variables: [
       "customer_name",
@@ -54,7 +54,7 @@ export const META_TEMPLATES: Record<
     variableFormats: { service_amount: "currency" },
   },
   JOB_RETURN: {
-    name: "uma_return",
+    name: "se_return",
     eventType: "JOB_RETURN",
     variables: ["customer_name", "product_name", "job_number"],
   },
@@ -87,7 +87,7 @@ export function getMetaTemplateDefinition(
   if (eventType === "JOB_CREATED") {
     if (settings.trackingLinkEnabled) {
       return {
-        name: "uma_job_created_link",
+        name: "se_job_created_link",
         eventType: "JOB_CREATED",
         variables: [
           "customer_name",
@@ -98,7 +98,7 @@ export function getMetaTemplateDefinition(
       };
     }
     return {
-      name: "uma_job_created",
+      name: "se_job_created",
       eventType: "JOB_CREATED",
       variables: ["customer_name", "product_name", "job_number"],
     };

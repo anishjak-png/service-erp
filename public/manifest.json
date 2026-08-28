@@ -1,7 +1,7 @@
 {
-  "name": "Uma Traders Job Cards",
-  "short_name": "Uma Traders",
-  "description": "Job card management for home appliance service",
+  "name": "Service ERP",
+  "short_name": "Service ERP",
+  "description": "Multi-tenant job card management for appliance service shops",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

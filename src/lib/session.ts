@@ -7,6 +7,10 @@ export type DeviceStatus = "pending" | "approved" | "revoked";
 export interface SessionData {
   role: StaffRole;
   isLoggedIn: boolean;
+  tenantId?: string;
+  tenantSlug?: string;
+  tenantName?: string;
+  jobPrefix?: string;
   staffUserId?: string;
   staffName?: string;
   deviceId?: string;
@@ -17,7 +21,7 @@ export interface SessionData {
 
 export const sessionOptions: SessionOptions = {
   password: process.env.SESSION_SECRET ?? "fallback-dev-secret-min-32-characters!!",
-  cookieName: "uma_session",
+  cookieName: "service_erp_session",
   cookieOptions: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
@@ -38,6 +42,10 @@ export function isDeviceApproved(session: SessionData): boolean {
 export async function clearSession(session: Awaited<ReturnType<typeof getSession>>) {
   session.role = "reception";
   session.isLoggedIn = false;
+  session.tenantId = undefined;
+  session.tenantSlug = undefined;
+  session.tenantName = undefined;
+  session.jobPrefix = undefined;
   session.staffUserId = undefined;
   session.staffName = undefined;
   session.deviceId = undefined;

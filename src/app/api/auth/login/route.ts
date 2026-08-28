@@ -12,6 +12,7 @@ import {
   upsertStaffDevice,
 } from "@/lib/staff-auth";
 import { getSession } from "@/lib/session";
+import { getTenantBySlug, resolveTenantSlugFromRequest } from "@/lib/tenant";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
   const deviceId = body.deviceId;
   const deviceLabel = body.deviceLabel;
   const platform = body.platform === "android" ? "android" : "web";
+  const bodyTenantSlug =
+    typeof body.tenantSlug === "string" ? body.tenantSlug.trim() : "";
 
   if (
     !mobileRaw ||
@@ -40,15 +43,66 @@ export async function POST(request: NextRequest) {
   }
 
   const mobile = normalizeMobile(mobileRaw);
-  const staffUser = await prisma.staffUser.findUnique({
-    where: { mobile },
-    include: { technician: true },
-  });
+  const tenantSlug =
+    bodyTenantSlug ||
+    resolveTenantSlugFromRequest({
+      host: request.headers.get("host"),
+      searchParams: request.nextUrl.searchParams,
+      headerSlug: request.headers.get("x-tenant-slug"),
+    });
+
+  let staffUser = null;
+
+  if (tenantSlug) {
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant || tenant.status !== "active") {
+      return NextResponse.json(
+        { error: "Shop not found or suspended" },
+        { status: 404 }
+      );
+    }
+    staffUser = await prisma.staffUser.findUnique({
+      where: {
+        tenantId_mobile: { tenantId: tenant.id, mobile },
+      },
+      include: { technician: true, tenant: true },
+    });
+  } else {
+    const matches = await prisma.staffUser.findMany({
+      where: { mobile, active: true },
+      include: { technician: true, tenant: true },
+      take: 2,
+    });
+    if (matches.length > 1) {
+      return NextResponse.json(
+        {
+          error:
+            "Multiple shops found for this mobile — open via ?tenant=slug or subdomain",
+        },
+        { status: 400 }
+      );
+    }
+    staffUser = matches[0] ?? null;
+  }
 
   if (!staffUser || !staffUser.active) {
     return NextResponse.json(
       { error: "Invalid mobile or password" },
       { status: 401 }
+    );
+  }
+
+  if (!staffUser.tenantId || !staffUser.tenant) {
+    return NextResponse.json(
+      { error: "Staff account is not linked to a shop" },
+      { status: 403 }
+    );
+  }
+
+  if (staffUser.tenant.status !== "active") {
+    return NextResponse.json(
+      { error: "Shop is suspended" },
+      { status: 403 }
     );
   }
 
@@ -60,11 +114,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const approvedCount = await countApprovedDevices();
+  const approvedCount = await countApprovedDevices(staffUser.tenantId);
   const autoApprove =
     staffUser.role === "admin" && approvedCount === 0;
 
   const device = await upsertStaffDevice({
+    tenantId: staffUser.tenantId,
     staffUserId: staffUser.id,
     deviceId: deviceId.trim(),
     deviceLabel: typeof deviceLabel === "string" ? deviceLabel : null,
@@ -84,6 +139,9 @@ export async function POST(request: NextRequest) {
   session.role = staffRoleToSessionRole(staffUser.role);
   session.deviceId = device.deviceId;
   session.deviceStatus = device.status;
+  session.tenantId = staffUser.tenantId;
+  session.tenantSlug = staffUser.tenant.slug;
+  session.tenantName = staffUser.tenant.name;
 
   if (staffUser.role === "technician" && staffUser.technician) {
     session.technicianId = staffUser.technician.id;
@@ -102,6 +160,7 @@ export async function POST(request: NextRequest) {
         deviceStatus: "pending",
         staffName: staffUser.name,
         role: session.role,
+        tenantSlug: session.tenantSlug,
       },
       { status: 403 }
     );
@@ -120,5 +179,8 @@ export async function POST(request: NextRequest) {
     deviceStatus: device.status,
     technicianId: session.technicianId,
     technicianName: session.technicianName,
+    tenantId: session.tenantId,
+    tenantSlug: session.tenantSlug,
+    tenantName: session.tenantName,
   });
 }

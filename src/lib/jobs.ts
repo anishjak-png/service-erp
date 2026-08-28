@@ -1,21 +1,29 @@
 import { JobStatus, Prisma } from "@prisma/client";
+import { DEFAULT_JOB_PREFIX } from "./constants";
 import { prisma } from "./db";
 
-export async function generateJobNumber(): Promise<string> {
+export async function generateJobNumber(
+  tenantId: string,
+  prefix = DEFAULT_JOB_PREFIX
+): Promise<string> {
+  if (!tenantId) {
+    throw new Error("generateJobNumber requires tenantId");
+  }
+  const safePrefix = prefix.trim() || DEFAULT_JOB_PREFIX;
   const sequence = await prisma.$transaction(async (tx) => {
-    const existing = await tx.jobSequence.findUnique({ where: { id: 1 } });
+    const existing = await tx.jobSequence.findUnique({ where: { tenantId } });
     if (existing) {
       return tx.jobSequence.update({
-        where: { id: 1 },
+        where: { tenantId },
         data: { lastNum: existing.lastNum + 1 },
       });
     }
     return tx.jobSequence.create({
-      data: { id: 1, lastNum: 1 },
+      data: { tenantId, lastNum: 1 },
     });
   });
 
-  return `UT ${sequence.lastNum}`;
+  return `${safePrefix} ${sequence.lastNum}`;
 }
 
 export type JobWithCustomer = Prisma.JobCardGetPayload<{
@@ -33,7 +41,7 @@ export function detectSearchQueryType(q: string): SearchQueryType {
   if (!trimmed) return "empty";
 
   const compact = trimmed.replace(/\s+/g, " ");
-  if (/^ut\s*\d+$/i.test(compact)) return "ut";
+  if (/^[a-z]{1,6}\s*\d+$/i.test(compact)) return "ut";
 
   const mobile = normalizeMobile(trimmed);
   if (mobile.length === 10 && /^[\d\s+\-()]+$/.test(trimmed)) return "mobile";
@@ -41,10 +49,10 @@ export function detectSearchQueryType(q: string): SearchQueryType {
   return "name";
 }
 
-/** Normalizes "ut1", "UT  12" → "UT 12" for exact job number lookup. */
+/** Normalizes "se1", "SE  12", "UT 12" → "SE 12" / "UT 12" for exact job number lookup. */
 export function normalizeJobNumberQuery(q: string): string {
-  const match = q.trim().match(/^ut\s*(\d+)$/i);
-  if (match) return `UT ${match[1]}`;
+  const match = q.trim().match(/^([a-z]{1,6})\s*(\d+)$/i);
+  if (match) return `${match[1].toUpperCase()} ${match[2]}`;
   return q.trim().toUpperCase();
 }
 

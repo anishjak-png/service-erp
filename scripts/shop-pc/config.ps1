@@ -1,7 +1,7 @@
 # Shared paths for shop PC print bridge scripts.
 $script:ShopPcConfigDir = Join-Path $env:LOCALAPPDATA "UmaService"
 $script:ShopPcConfigFile = Join-Path $script:ShopPcConfigDir "print-bridge.json"
-$script:ShopPcTaskName = "Uma Traders Print Bridge"
+$script:ShopPcTaskName = "Service ERP Print Bridge"
 $script:ShopPcZipUrl = "https://github.com/anishjak-png/uma_service/archive/refs/heads/main.zip"
 $script:ShopPcZipRootFolder = "uma_service-main"
 

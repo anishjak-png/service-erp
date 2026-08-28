@@ -1,6 +1,8 @@
-export const APP_NAME = "UMA SERVICE";
-export const SHOP_NAME = process.env.NEXT_PUBLIC_SHOP_NAME ?? "Uma Traders";
+export const APP_NAME = "Service ERP";
+export const SHOP_NAME = process.env.NEXT_PUBLIC_SHOP_NAME ?? "Your Shop";
 export const SHOP_PHONE = process.env.NEXT_PUBLIC_SHOP_PHONE ?? "";
+/** Default job number prefix when tenant has none (multi-tenant overrides per shop). */
+export const DEFAULT_JOB_PREFIX = process.env.JOB_NUMBER_PREFIX?.trim() || "SE";
 
 /** Public base URL for tracking links, receipts, etc. */
 function resolveAppUrl(): string {

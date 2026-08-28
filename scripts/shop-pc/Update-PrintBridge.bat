@@ -1,5 +1,5 @@
 @echo off
-title Uma Traders Print Bridge - Update (Administrator)
+title Service ERP Print Bridge - Update (Administrator)
 cd /d "%~dp0"
 echo.
 echo  Administrator update: git pull + npm install

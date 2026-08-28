@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-import { SHOP_NAME } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
 
 export const metadata: Metadata = {
-  title: SHOP_NAME,
-  description: "Job card management for home appliance service",
+  title: APP_NAME,
+  description: "Multi-tenant job card management for appliance service shops",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: SHOP_NAME,
+    title: APP_NAME,
   },
 };
 

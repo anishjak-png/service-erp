@@ -1,5 +1,10 @@
 import { JobStatus, PrismaClient } from "@prisma/client";
 
+/**
+ * Multi-tenancy: all new queries on tenant-scoped models MUST include tenantId.
+ * See `tenantWhere` / `requireTenantId` in `src/lib/tenant.ts`.
+ */
+
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function prismaHasWarrantySupport(): boolean {

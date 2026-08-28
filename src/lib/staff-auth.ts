@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/db";
 import type { DeviceStatus, StaffRole } from "@prisma/client";
 
-export async function countApprovedDevices(): Promise<number> {
-  return prisma.staffDevice.count({ where: { status: "approved" } });
+export async function countApprovedDevices(tenantId?: string): Promise<number> {
+  return prisma.staffDevice.count({
+    where: {
+      status: "approved",
+      ...(tenantId ? { tenantId } : {}),
+    },
+  });
 }
 
 export async function countPendingDevices(): Promise<number> {
@@ -39,6 +44,7 @@ export async function getStaffDevice(
 }
 
 export async function upsertStaffDevice(params: {
+  tenantId: string;
   staffUserId: string;
   deviceId: string;
   deviceLabel?: string | null;
@@ -67,6 +73,7 @@ export async function upsertStaffDevice(params: {
 
   return prisma.staffDevice.create({
     data: {
+      tenantId: params.tenantId,
       staffUserId: params.staffUserId,
       deviceId: params.deviceId,
       deviceLabel: params.deviceLabel ?? null,

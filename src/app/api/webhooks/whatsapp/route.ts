@@ -4,8 +4,13 @@ import {
   processMetaWhatsAppWebhook,
   verifyWebhookSignature,
 } from "@/lib/notifications/inbound/meta-webhook";
+import { isWhatsAppEnabled } from "@/lib/tenant";
 
 export async function GET(request: NextRequest) {
+  if (!isWhatsAppEnabled()) {
+    return new NextResponse("WhatsApp disabled", { status: 503 });
+  }
+
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
@@ -25,6 +30,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isWhatsAppEnabled()) {
+    return new NextResponse("OK", { status: 200 });
+  }
+
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
 

@@ -15,7 +15,7 @@ if ($config -and $config.projectPath -and (Test-Path $config.projectPath)) {
 }
 
 Write-Host ""
-Write-Host "  Uma Traders - Print Bridge Update" -ForegroundColor Green
+Write-Host "  Service ERP - Print Bridge Update" -ForegroundColor Green
 Write-Host "  =================================" -ForegroundColor Green
 Write-Host ""
 

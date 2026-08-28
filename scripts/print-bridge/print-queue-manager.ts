@@ -4,7 +4,6 @@ import type { BridgeConfig } from "./config";
 import { log, type BridgeLogger } from "./logger";
 import { LanPrinter } from "./printer";
 import { buildReceiptBuffer } from "./receipt";
-import { buildSaleReceiptBuffer } from "./sale-receipt";
 import type { JobCardRow, PrintJobRow, QueuedPrintJob } from "./types";
 
 export class PrintQueueManager {
@@ -31,6 +30,14 @@ export class PrintQueueManager {
 
     if (row.branchId !== this.config.branchId) {
       this.logger.info(log.skipped(row.id, `branch ${row.branchId} != ${this.config.branchId}`));
+      return;
+    }
+    if (
+      this.config.tenantId &&
+      row.tenantId &&
+      row.tenantId !== this.config.tenantId
+    ) {
+      this.logger.info(log.skipped(row.id, `tenant ${row.tenantId} != ${this.config.tenantId}`));
       return;
     }
 
@@ -173,27 +180,6 @@ export class PrintQueueManager {
       return;
     }
 
-    if (row.type === "sale") {
-      this.logger.info(log.printing(`sale:${isSaleBillNo(row.payload)}`));
-      try {
-        const buffer = buildSaleReceiptBuffer(row.payload, this.config);
-        await this.printer.print(buffer);
-        await this.markPrinted(id);
-        this.processedIds.add(id);
-        this.state.setLastPrinted(isSaleBillNo(row.payload));
-        this.logger.info(log.success(isSaleBillNo(row.payload)));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Print failed";
-        await this.markFailed(id, message);
-        this.processedIds.add(id);
-        this.state.setLastError(message);
-        this.logger.error(log.failed(isSaleBillNo(row.payload), message));
-      } finally {
-        this.inFlightIds.delete(id);
-      }
-      return;
-    }
-
     if (!row.jobCardId) {
       const msg = "Job card not found";
       await this.markFailed(id, msg);
@@ -263,12 +249,4 @@ export class PrintQueueManager {
       })
       .eq("id", id);
   }
-}
-
-function isSaleBillNo(payload: unknown): string {
-  if (payload && typeof payload === "object" && "billNo" in payload) {
-    const billNo = (payload as { billNo?: unknown }).billNo;
-    if (typeof billNo === "string" && billNo) return billNo;
-  }
-  return "sale";
 }

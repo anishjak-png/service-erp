@@ -160,14 +160,14 @@ function Register-LoginStartup {
     -Action $action `
     -Trigger $trigger `
     -Settings $settings `
-    -Description "Uma Traders print bridge (Supabase Realtime)" `
+    -Description "Service ERP print bridge (Supabase Realtime)" `
     | Out-Null
 
   Write-Host "Task '$($script:ShopPcTaskName)' will run at every login." -ForegroundColor Green
 }
 
 Write-Host ""
-Write-Host "  Uma Traders - Print Bridge Installer" -ForegroundColor Green
+Write-Host "  Service ERP - Print Bridge Installer" -ForegroundColor Green
 Write-Host "  ====================================" -ForegroundColor Green
 
 Ensure-Node

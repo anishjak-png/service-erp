@@ -130,6 +130,14 @@ export async function sendWhatsAppNotification(params: {
   eventType: NotificationEventType;
   manual?: boolean;
 }): Promise<NotificationProcessResult> {
+  if (process.env.WHATSAPP_ENABLED !== "true") {
+    logNotificationSkip("WhatsApp disabled (WHATSAPP_ENABLED!=true)", {
+      jobId: params.jobId,
+      eventType: params.eventType,
+    });
+    return { sent: false, skipped: true, error: "WhatsApp disabled" };
+  }
+
   const { jobId, eventType, manual = false } = params;
 
   const [settings, job] = await Promise.all([

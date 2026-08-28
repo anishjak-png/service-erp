@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
-title Build Uma Traders Staff APK
+title Build Service ERP Staff APK
 cd /d "%~dp0..\.."
 
 echo.
