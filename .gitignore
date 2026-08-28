@@ -34,6 +34,9 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.env.shop
+!.env.example
+!.env.shop.example
 
 # vercel
 .vercel
@@ -44,9 +47,6 @@ resources/staff*.yaml
 
 /prisma/dev.db
 /prisma/dev.db-journal
-
-.vercel
-.env*
 
 /logs/
 

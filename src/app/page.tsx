@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SHOP_NAME } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
@@ -16,12 +16,17 @@ import {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tenantSlug = searchParams.get("tenant")?.trim() ?? "";
+  const tenantFromUrl = searchParams.get("tenant")?.trim() ?? "";
   const { refreshAuth, isLoggedIn, deviceApproved, role, loaded } = useAuth();
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
+  const [tenantSlug, setTenantSlug] = useState(tenantFromUrl);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (tenantFromUrl) setTenantSlug(tenantFromUrl);
+  }, [tenantFromUrl]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -49,7 +54,7 @@ function LoginForm() {
         deviceId: identity.deviceId,
         deviceLabel: identity.deviceLabel,
         platform: identity.platform,
-        ...(tenantSlug ? { tenantSlug } : {}),
+        ...(tenantSlug.trim() ? { tenantSlug: tenantSlug.trim() } : {}),
       }),
     });
 
@@ -97,14 +102,28 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 to-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-emerald-800">{SHOP_NAME}</CardTitle>
-          <p className="text-sm text-slate-500">Job Card System</p>
-          {tenantSlug ? (
-            <p className="text-xs text-emerald-700">Shop: {tenantSlug}</p>
-          ) : null}
+          <CardTitle className="text-2xl text-emerald-800">{APP_NAME}</CardTitle>
+          <p className="text-sm text-slate-500">Multi-tenant service job cards</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="tenantSlug"
+                className="text-sm font-medium text-slate-700"
+              >
+                Shop slug (optional if unique mobile)
+              </label>
+              <input
+                id="tenantSlug"
+                type="text"
+                value={tenantSlug}
+                onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
+                placeholder="e.g. demo"
+                className="flex h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              />
+            </div>
+
             <div className="space-y-2">
               <label
                 htmlFor="mobile"
