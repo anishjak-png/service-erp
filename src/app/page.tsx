@@ -178,14 +178,14 @@ function LoginForm() {
             New device? Admin must approve after first login.
           </p>
           <p className="mt-3 text-center text-sm">
-            <Link href="/signup" className="font-medium text-emerald-700 hover:underline">
+            <a href="/signup" className="font-medium text-emerald-700 hover:underline">
               New shop? Create an account
-            </Link>
+            </a>
           </p>
           <p className="mt-3 text-center text-sm">
-            <Link href="/track" className="font-medium text-emerald-700 hover:underline">
+            <a href="/track" className="font-medium text-emerald-700 hover:underline">
               Customer? Track your job status
-            </Link>
+            </a>
           </p>
         </CardContent>
       </Card>

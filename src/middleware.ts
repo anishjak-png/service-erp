@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, isDeviceApproved } from "@/lib/session";
 import { resolveTenantSlugFromRequest } from "@/lib/tenant-host";
 
-const publicPaths = [
+/** Routes that never need a session cookie read in middleware. */
+const sessionFreePaths = new Set([
+  "/signup",
+  "/track",
+  "/api/auth/login",
+  "/api/auth/signup",
+  "/api/webhooks/whatsapp",
+]);
+
+const sessionFreePrefixes = ["/j/", "/api/track"];
+
+const publicPaths = new Set([
   "/",
   "/j",
   "/track",
@@ -11,12 +22,30 @@ const publicPaths = [
   "/api/auth/signup",
   "/device-pending",
   "/api/webhooks/whatsapp",
-];
+]);
 const publicPrefixes = ["/j/", "/api/track"];
 
+function isSessionFree(pathname: string): boolean {
+  if (sessionFreePaths.has(pathname)) return true;
+  return sessionFreePrefixes.some((p) => pathname.startsWith(p));
+}
+
 function isPublic(pathname: string): boolean {
-  if (publicPaths.includes(pathname)) return true;
+  if (publicPaths.has(pathname)) return true;
   return publicPrefixes.some((p) => pathname.startsWith(p));
+}
+
+function withTenantHeaders(request: NextRequest): Headers {
+  const tenantSlug = resolveTenantSlugFromRequest({
+    host: request.headers.get("host"),
+    searchParams: request.nextUrl.searchParams,
+    headerSlug: request.headers.get("x-tenant-slug"),
+  });
+  const requestHeaders = new Headers(request.headers);
+  if (tenantSlug) {
+    requestHeaders.set("x-tenant-slug", tenantSlug);
+  }
+  return requestHeaders;
 }
 
 export async function middleware(request: NextRequest) {
@@ -28,8 +57,11 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Middleware error" }, { status: 500 });
     }
-    if (pathname === "/") {
-      return NextResponse.next();
+    // Never bounce public pages back to home on session errors.
+    if (isSessionFree(pathname) || pathname === "/") {
+      return NextResponse.next({
+        request: { headers: withTenantHeaders(request) },
+      });
     }
     return NextResponse.redirect(new URL("/", request.url));
   }
@@ -47,15 +79,13 @@ async function runMiddleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const tenantSlug = resolveTenantSlugFromRequest({
-    host: request.headers.get("host"),
-    searchParams: request.nextUrl.searchParams,
-    headerSlug: request.headers.get("x-tenant-slug"),
-  });
+  const requestHeaders = withTenantHeaders(request);
 
-  const requestHeaders = new Headers(request.headers);
-  if (tenantSlug) {
-    requestHeaders.set("x-tenant-slug", tenantSlug);
+  // Signup / track / public job pages: do not touch the session cookie.
+  if (isSessionFree(pathname)) {
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
   }
 
   const session = await getSession();
