@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, isDeviceApproved } from "@/lib/session";
-import { resolveTenantSlugFromRequest } from "@/lib/tenant";
+import { resolveTenantSlugFromRequest } from "@/lib/tenant-host";
 
 const publicPaths = [
   "/",
@@ -20,6 +20,22 @@ function isPublic(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  try {
+    return await runMiddleware(request);
+  } catch (err) {
+    console.error("[middleware]", err);
+    const { pathname } = request.nextUrl;
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Middleware error" }, { status: 500 });
+    }
+    if (pathname === "/") {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+}
+
+async function runMiddleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
