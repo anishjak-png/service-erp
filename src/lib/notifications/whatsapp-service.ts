@@ -162,6 +162,7 @@ export async function sendWhatsAppNotification(params: {
     });
     const log = await prisma.notificationLog.create({
       data: {
+        tenantId: job.tenantId,
         jobCardId: jobId,
         eventType,
         channel: "WHATSAPP",
@@ -199,6 +200,7 @@ export async function sendWhatsAppNotification(params: {
       });
       const log = await prisma.notificationLog.create({
         data: {
+          tenantId: job.tenantId,
           jobCardId: jobId,
           eventType,
           channel: "WHATSAPP",
@@ -237,6 +239,7 @@ export async function sendWhatsAppNotification(params: {
       });
       const log = await prisma.notificationLog.create({
         data: {
+          tenantId: job.tenantId,
           jobCardId: jobId,
           eventType,
           channel: "WHATSAPP",
@@ -259,6 +262,7 @@ export async function sendWhatsAppNotification(params: {
       logNotificationSkip("WhatsApp automation is disabled", { jobId, eventType });
       const log = await prisma.notificationLog.create({
         data: {
+          tenantId: job.tenantId,
           jobCardId: jobId,
           eventType,
           channel: "WHATSAPP",
@@ -284,6 +288,7 @@ export async function sendWhatsAppNotification(params: {
       });
       const log = await prisma.notificationLog.create({
         data: {
+          tenantId: job.tenantId,
           jobCardId: jobId,
           eventType,
           channel: "WHATSAPP",
@@ -309,6 +314,7 @@ export async function sendWhatsAppNotification(params: {
       });
       const log = await prisma.notificationLog.create({
         data: {
+          tenantId: job.tenantId,
           jobCardId: jobId,
           eventType,
           channel: "WHATSAPP",
@@ -337,6 +343,7 @@ export async function sendWhatsAppNotification(params: {
       logNotificationError(metaResult.error, { jobId, eventType });
       const log = await prisma.notificationLog.create({
         data: {
+          tenantId: job.tenantId,
           jobCardId: jobId,
           eventType,
           channel: "WHATSAPP",
@@ -407,6 +414,7 @@ export async function sendWhatsAppNotification(params: {
 
   const log = await prisma.notificationLog.create({
     data: {
+      tenantId: job.tenantId,
       jobCardId: jobId,
       eventType,
       channel: "WHATSAPP",

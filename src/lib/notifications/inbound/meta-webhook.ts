@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
 import { ACTIVE_JOB_STATUSES } from "@/lib/prisma-statuses";
 import { parseWaIdToMobile } from "@/lib/notifications/providers/meta/phone";
+import { getTenantBySlug } from "@/lib/tenant";
 
 type MetaInboundMessage = {
   from: string;
@@ -133,8 +134,17 @@ async function persistInboundMessage(
   });
   if (existing) return;
 
+  const defaultSlug = process.env.DEFAULT_TENANT_SLUG?.trim().toLowerCase();
+  const tenant = defaultSlug ? await getTenantBySlug(defaultSlug) : null;
+  if (!tenant) {
+    console.warn(
+      "[WhatsApp Webhook] No DEFAULT_TENANT_SLUG tenant — skipping inbound persist"
+    );
+    return;
+  }
+
   const customer = await prisma.customer.findUnique({
-    where: { mobile },
+    where: { tenantId_mobile: { tenantId: tenant.id, mobile } },
     select: { id: true },
   });
 
@@ -150,7 +160,7 @@ async function persistInboundMessage(
         where: {
           reactedToWamid,
           messageType: "reaction",
-          conversation: { customerMobile: mobile },
+          conversation: { tenantId: tenant.id, customerMobile: mobile },
         },
       });
     }
@@ -173,15 +183,21 @@ async function persistInboundMessage(
         reactedToWamid,
         messageType: "reaction",
         direction: "inbound",
-        conversation: { customerMobile: mobile },
+        conversation: { tenantId: tenant.id, customerMobile: mobile },
       },
     });
   }
 
   await prisma.$transaction(async (tx) => {
     const conversation = await tx.whatsAppConversation.upsert({
-      where: { customerMobile: mobile },
+      where: {
+        tenantId_customerMobile: {
+          tenantId: tenant.id,
+          customerMobile: mobile,
+        },
+      },
       create: {
+        tenantId: tenant.id,
         customerMobile: mobile,
         customerId: customer?.id ?? null,
         lastMessageAt: messageAt,
@@ -198,6 +214,7 @@ async function persistInboundMessage(
 
     await tx.whatsAppMessage.create({
       data: {
+        tenantId: tenant.id,
         conversationId: conversation.id,
         direction: "inbound",
         wamid: msg.id,
