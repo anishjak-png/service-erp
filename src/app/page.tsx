@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { APP_NAME } from "@/lib/constants";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter, useSearchParams } from "next/navigation";
