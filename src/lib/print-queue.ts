@@ -1,8 +1,8 @@
 import { PrintJobStatus } from "@prisma/client";
 import { prisma } from "./db";
+import { resolvePrinterId } from "./printers";
 
 const DEFAULT_BRANCH_ID = process.env.PRINT_BRANCH_ID?.trim() || "main";
-const DEFAULT_PRINTER_ID = process.env.PRINT_PRINTER_ID?.trim() || "counter-1";
 
 export async function enqueueReceiptPrint(
   jobCardId: string,
@@ -49,6 +49,8 @@ export async function enqueueReceiptPrint(
     }
   }
 
+  const printerId = await resolvePrinterId(tenantId, "job_new");
+
   return prisma.printJob.create({
     data: {
       tenantId,
@@ -56,7 +58,104 @@ export async function enqueueReceiptPrint(
       type: "receipt",
       status: "Pending",
       branchId: DEFAULT_BRANCH_ID,
-      printerId: DEFAULT_PRINTER_ID,
+      printerId,
+    },
+  });
+}
+
+export async function enqueueTokenReceiptPrint(
+  tokenCardId: string,
+  options?: { reprint?: boolean; tenantId?: string }
+) {
+  const reprint = options?.reprint ?? false;
+
+  let tenantId = options?.tenantId;
+  if (!tenantId) {
+    const token = await prisma.tokenCard.findUnique({
+      where: { id: tokenCardId },
+      select: { tenantId: true },
+    });
+    if (!token) throw new Error("Token not found for print");
+    tenantId = token.tenantId;
+  }
+
+  if (reprint) {
+    await prisma.printJob.updateMany({
+      where: {
+        tenantId,
+        tokenCardId,
+        type: "token_receipt",
+        status: { in: ["Pending", "Printing"] },
+      },
+      data: {
+        status: "Failed",
+        errorMessage: "Superseded by new print request",
+      },
+    });
+  }
+
+  const printerId = await resolvePrinterId(tenantId, "token_new");
+
+  return prisma.printJob.create({
+    data: {
+      tenantId,
+      tokenCardId,
+      type: "token_receipt",
+      status: "Pending",
+      branchId: DEFAULT_BRANCH_ID,
+      printerId,
+    },
+  });
+}
+
+export async function enqueueJobDeliveryPrint(
+  jobCardId: string,
+  options?: { tenantId?: string }
+) {
+  let tenantId = options?.tenantId;
+  if (!tenantId) {
+    const job = await prisma.jobCard.findUnique({
+      where: { id: jobCardId },
+      select: { tenantId: true },
+    });
+    if (!job) throw new Error("Job not found for print");
+    tenantId = job.tenantId;
+  }
+  const printerId = await resolvePrinterId(tenantId, "job_delivery");
+  return prisma.printJob.create({
+    data: {
+      tenantId,
+      jobCardId,
+      type: "receipt",
+      status: "Pending",
+      branchId: DEFAULT_BRANCH_ID,
+      printerId,
+    },
+  });
+}
+
+export async function enqueueTokenDeliveryPrint(
+  tokenCardId: string,
+  options?: { tenantId?: string }
+) {
+  let tenantId = options?.tenantId;
+  if (!tenantId) {
+    const token = await prisma.tokenCard.findUnique({
+      where: { id: tokenCardId },
+      select: { tenantId: true },
+    });
+    if (!token) throw new Error("Token not found for print");
+    tenantId = token.tenantId;
+  }
+  const printerId = await resolvePrinterId(tenantId, "token_delivery");
+  return prisma.printJob.create({
+    data: {
+      tenantId,
+      tokenCardId,
+      type: "token_receipt",
+      status: "Pending",
+      branchId: DEFAULT_BRANCH_ID,
+      printerId,
     },
   });
 }

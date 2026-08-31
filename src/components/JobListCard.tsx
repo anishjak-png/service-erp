@@ -3,7 +3,7 @@ import { JobStatusBadge } from "@/components/JobStatusBadge";
 import { CallCustomerButton } from "@/components/CallCustomerButton";
 import { DeliveryCallButton } from "@/components/DeliveryCallButton";
 import { DeliveryContactBadge } from "@/components/DeliveryContactBadge";
-import { formatCurrency } from "@/lib/currency";
+import { formatBillSplitLine, formatCurrency } from "@/lib/currency";
 import {
   formatExpectedDeliveryDate,
   shouldShowDeliveryContact,
@@ -26,6 +26,10 @@ export type JobListCardProps = {
   showAssignee?: boolean;
   meta?: ReactNode;
   serviceAmount?: number | null;
+  serviceCharge?: number | null;
+  sparesAmount?: number | null;
+  /** Admin-only: show Service · Spares under the total. */
+  showBillSplit?: boolean;
   showServiceAmount?: boolean;
   showCallIcon?: boolean;
   deliveryContactStatus?: DeliveryContactStatus;
@@ -52,6 +56,9 @@ export function JobListCard({
   showAssignee = false,
   meta,
   serviceAmount,
+  serviceCharge,
+  sparesAmount,
+  showBillSplit = false,
   showServiceAmount = true,
   showCallIcon = true,
   deliveryContactStatus,
@@ -71,20 +78,12 @@ export function JobListCard({
   // Ready/Return always open the delivery-call log (all staff roles).
   const useDeliveryCallLog = enableDeliveryCallLog || pickupReady;
 
-  const assigneeText =
-    showAssignee && assigneeName ? (
-      <span className="font-medium text-slate-600">{assigneeName}</span>
-    ) : showAssignee ? (
-      <span className="text-slate-400">Unassigned</span>
-    ) : null;
-
   const expectedLabel =
     contactStatus === "contacted"
       ? formatExpectedDeliveryDate(expectedDeliveryAt)
       : null;
 
   const metaParts: ReactNode[] = [];
-  if (assigneeText) metaParts.push(assigneeText);
   if (meta) metaParts.push(meta);
   if (expectedLabel) {
     metaParts.push(
@@ -94,7 +93,14 @@ export function JobListCard({
     );
   }
 
-  const detailLine = [applianceLine, complaint, emphasis].filter(Boolean).join(" · ");
+  const detailLine = [
+    applianceLine,
+    complaint,
+    emphasis,
+    showAssignee ? assigneeName?.trim() || "Unassigned" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const displayAmount = shouldShowJobServiceAmount(
     status,
     serviceAmount,
@@ -117,23 +123,23 @@ export function JobListCard({
 
   return (
     <div className="rounded-md border border-slate-200 bg-white shadow-sm transition-colors hover:bg-slate-50">
-      <div className="flex items-start gap-2.5 p-2.5">
+      <div className="flex items-start gap-1.5 p-2">
         <Link href={`/jobs/${id}`} className="min-w-0 flex-1 active:scale-[0.99]">
-          <div className="flex min-w-0 items-baseline gap-2">
+          <div className="flex min-w-0 items-baseline gap-1.5">
             <span className="shrink-0 text-sm font-semibold text-slate-900">
               {jobNumber}
             </span>
-            <span className="min-w-0 truncate text-sm text-slate-700">
+            <span className="min-w-0 truncate text-sm font-bold text-slate-900">
               {displayName}
             </span>
           </div>
           {detailLine && (
-            <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-slate-600">
+            <p className="mt-0.5 line-clamp-1 text-xs leading-snug text-slate-600">
               {detailLine}
             </p>
           )}
           {metaParts.length > 0 && (
-            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-slate-500">
+            <p className="mt-0.5 line-clamp-1 text-xs leading-snug text-slate-500">
               {metaParts.map((part, i) => (
                 <span key={i}>
                   {i > 0 ? " · " : ""}
@@ -143,12 +149,24 @@ export function JobListCard({
             </p>
           )}
           {displayAmount && (
-            <p className="mt-1 text-xs font-semibold text-emerald-700">
-              {formatCurrency(serviceAmount)}
+            <p className="mt-0.5 truncate text-xs leading-snug">
+              <span className="font-semibold text-emerald-700">
+                {formatCurrency(serviceAmount)}
+              </span>
+              {showBillSplit ? (
+                <span className="font-normal text-slate-500">
+                  {" · "}
+                  {formatBillSplitLine({
+                    serviceAmount,
+                    serviceCharge,
+                    sparesAmount,
+                  })}
+                </span>
+              ) : null}
             </p>
           )}
         </Link>
-        <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
+        <div className="flex w-auto shrink-0 flex-col items-end gap-1 pt-0.5">
           <div className="flex flex-wrap items-center justify-end gap-1">
             {badge ?? <JobStatusBadge status={status} />}
             {showContact && contactStatus && (

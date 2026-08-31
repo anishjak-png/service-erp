@@ -122,12 +122,16 @@ export default function NewJobPage() {
     };
   }, [photoPreviews, warrantyCardPreviews]);
 
+  const lookupMobileRef = useRef("");
+
   const lookupCustomer = useCallback(async (value: string) => {
     const digits = value.replace(/\D/g, "").slice(-10);
+    lookupMobileRef.current = digits;
     if (digits.length !== 10) return;
 
     const res = await fetch(`/api/customers/lookup?mobile=${digits}`);
     const data = await res.json();
+    if (lookupMobileRef.current !== digits) return;
     if (data.found) {
       if (data.name) setCustomerName(data.name);
       if (typeof data.allowWhatsappNotifications === "boolean") {
@@ -605,6 +609,7 @@ export default function NewJobPage() {
                 value={mobile}
                 onChange={(e) => {
                   setMobile(e.target.value);
+                  setCustomerName("");
                   lookupCustomer(e.target.value);
                 }}
                 placeholder="10-digit mobile number"

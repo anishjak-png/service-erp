@@ -6,6 +6,7 @@ type ReceptionDashboardProps = {
   data: {
     todayJobs: number;
     pendingJobs: number;
+    pendingTokens: number;
     readyJobs: number;
     waitingApprovalJobs: number;
     outsourcedJobs: number;
@@ -29,12 +30,26 @@ type ReceptionDashboardProps = {
 export function ReceptionDashboard({ data }: ReceptionDashboardProps) {
   return (
     <div className="space-y-3">
-      <Link
-        href="/jobs/new"
-        className="block rounded-md bg-emerald-600 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-700"
-      >
-        New Job
-      </Link>
+      <div className="grid grid-cols-2 gap-2">
+        <Link
+          href="/jobs/new"
+          className="rounded-md bg-emerald-600 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-700"
+        >
+          New Job
+        </Link>
+        <Link
+          href="/tokens/new"
+          className="rounded-md border border-emerald-600 bg-white py-3 text-center text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+        >
+          New Token
+        </Link>
+        <Link
+          href="/tokens?status=Pending"
+          className="col-span-2 rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Pending Tokens{data.pendingTokens > 0 ? ` (${data.pendingTokens})` : ""}
+        </Link>
+      </div>
 
       <ReadyPickupList jobs={data.readyForPickup} />
 

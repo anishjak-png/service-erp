@@ -36,7 +36,7 @@ function TrackForm() {
 
     const digits = mobile.replace(/\D/g, "").slice(-10);
     const qs = new URLSearchParams({ mobile: digits });
-    if (tenantSlug.trim()) qs.set("tenant", tenantSlug.trim().toLowerCase());
+    if (tenantSlug.trim()) qs.set("tenant", tenantSlug.trim());
 
     const res = await fetch(`/api/track?${qs.toString()}`);
     const data = await res.json();
@@ -62,14 +62,14 @@ function TrackForm() {
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-2">
               <label htmlFor="tenant" className="text-sm font-medium text-slate-700">
-                Shop slug
+                Shop name
               </label>
               <input
                 id="tenant"
                 type="text"
                 value={tenantSlug}
-                onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
-                placeholder="e.g. demo"
+                onChange={(e) => setTenantSlug(e.target.value)}
+                placeholder="e.g. UMA TRADERS"
                 className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               />
             </div>

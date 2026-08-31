@@ -55,7 +55,7 @@ function parsePipeline(raw: string | null): ReportPipeline | null {
 const PIPELINE_STATUSES: Record<ReportPipeline, JobStatus[]> = {
   delivered: ["Delivered"],
   returned: ["Delivered"],
-  undelivered: ["Ready", "Return"],
+  undelivered: ["JobCompleted", "Ready", "Return"],
   pending: [
     "Pending",
     "WaitingForCustomerApproval",

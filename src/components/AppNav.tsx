@@ -9,14 +9,24 @@ import { useAuth } from "./AuthProvider";
 type NavLink = { href: string; label: string };
 
 function getNavLinks(
-  role: "reception" | "technician" | "admin" | null,
-  pendingDeviceCount: number
+  role: "reception" | "technician" | "admin" | "verifier" | null,
+  pendingDeviceCount: number,
+  readyCount = 0
 ): NavLink[] {
   if (role === "technician") {
     return [
       { href: "/jobs/pending?scope=my", label: "Home" },
       { href: "/jobs/new", label: "New Job" },
       { href: "/jobs/delivery", label: "Delivery" },
+      { href: "/jobs/search", label: "Search" },
+    ];
+  }
+
+  if (role === "verifier") {
+    return [
+      { href: "/jobs/ready", label: readyCount > 0 ? `Ready (${readyCount})` : "Ready" },
+      { href: "/jobs/delivery", label: "Delivery" },
+      { href: "/jobs/pending", label: "Pending" },
       { href: "/jobs/search", label: "Search" },
     ];
   }
@@ -41,7 +51,7 @@ function getNavLinks(
 }
 
 function getUserSubtitle(
-  role: "reception" | "technician" | "admin" | null,
+  role: "reception" | "technician" | "admin" | "verifier" | null,
   staffName: string | null,
   technicianName: string | null
 ) {
@@ -49,12 +59,14 @@ function getUserSubtitle(
     if (role === "technician") return `${staffName} · Technician`;
     if (role === "reception") return `${staffName} · Reception`;
     if (role === "admin") return `${staffName} · Admin`;
+    if (role === "verifier") return `${staffName} · Verifier`;
   }
   if (role === "technician") {
     return technicianName ? `${technicianName} (Technician)` : "Technician";
   }
   if (role === "reception") return "Reception";
   if (role === "admin") return "Admin";
+  if (role === "verifier") return "Verifier";
   return null;
 }
 
@@ -62,13 +74,24 @@ export function AppNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { role, staffName, technicianName, pendingDeviceCount, refreshAuth } =
-    useAuth();
+  const {
+    role,
+    staffName,
+    tenantName,
+    technicianName,
+    pendingDeviceCount,
+    unreadAlertCount,
+    refreshAuth,
+  } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const links = getNavLinks(role, pendingDeviceCount);
+  const links = getNavLinks(role, pendingDeviceCount, unreadAlertCount);
   const homeHref =
-    role === "technician" ? "/jobs/pending?scope=my" : "/dashboard";
+    role === "technician"
+      ? "/jobs/pending?scope=my"
+      : role === "verifier"
+        ? "/jobs/ready"
+        : "/dashboard";
   const userSubtitle = getUserSubtitle(role, staffName, technicianName);
   const adminTab = searchParams.get("tab");
   const showUniversalSearch = Boolean(role);
@@ -111,7 +134,7 @@ export function AppNav() {
           <div className="flex items-center justify-between gap-2">
             <Link href={homeHref} className="min-w-0">
               <h1 className="truncate text-sm font-bold uppercase tracking-wide text-white">
-                {APP_NAME}
+                {tenantName ? `${APP_NAME} - ${tenantName}` : APP_NAME}
               </h1>
               {userSubtitle && (
                 <p className="truncate text-xs text-emerald-200">{userSubtitle}</p>

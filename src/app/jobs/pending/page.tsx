@@ -33,6 +33,8 @@ type PendingJob = {
   receivedAt: string;
   readyAt?: string | null;
   serviceAmount?: number | null;
+  serviceCharge?: number | null;
+  sparesAmount?: number | null;
   deliveryContactStatus?: "not_contacted" | "contacted";
   expectedDeliveryAt?: string | null;
   assignedTechnician?: { name: string } | null;
@@ -75,8 +77,9 @@ function parseActiveJobs(items: PendingJob[]): PendingJob[] {
 const BOARD_STATUS_RANK: Record<string, number> = {
   Pending: 0,
   WaitingForCustomerApproval: 1,
-  Ready: 2,
-  Return: 3,
+  JobCompleted: 2,
+  Ready: 3,
+  Return: 4,
   Outsourced: 4,
   WarrantyPending: 5,
   WarrantyWithCompany: 6,
@@ -378,6 +381,20 @@ function PendingJobsContent() {
         </div>
       )}
 
+      {(isTechnician || role === "admin" || role === "reception") && (
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <span className="rounded-md bg-emerald-600 py-2 text-center text-xs font-semibold text-white">
+            {isTechnician ? "My Jobs" : "Jobs"}
+          </span>
+          <Link
+            href={isTechnician ? "/tokens" : "/tokens?status=Pending"}
+            className="rounded-md border border-slate-300 bg-white py-2 text-center text-xs font-semibold text-slate-700"
+          >
+            {isTechnician ? "My Tokens" : "Tokens"}
+          </Link>
+        </div>
+      )}
+
       {showSpecialFilters && (
         <div className="mb-3 flex flex-wrap gap-2">
           <button
@@ -517,6 +534,9 @@ function PendingJobsContent() {
                 .join(" ")}
               complaint={job.complaint}
               serviceAmount={job.serviceAmount}
+              serviceCharge={job.serviceCharge}
+              sparesAmount={job.sparesAmount}
+              showBillSplit={role === "admin"}
               showServiceAmount={!isTechnician}
               emphasis={warrantyEmphasis(job)}
               showAssignee={shouldShowAssignee(job)}

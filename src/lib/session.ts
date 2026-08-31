@@ -1,7 +1,7 @@
 import { getIronSession, SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
 
-export type StaffRole = "reception" | "technician" | "admin";
+export type StaffRole = "reception" | "technician" | "admin" | "verifier";
 export type DeviceStatus = "pending" | "approved" | "revoked";
 
 export interface SessionData {
@@ -17,6 +17,7 @@ export interface SessionData {
   deviceStatus?: DeviceStatus;
   technicianId?: string;
   technicianName?: string;
+  isPlatformAdmin?: boolean;
 }
 
 export const sessionOptions: SessionOptions = {
@@ -52,5 +53,6 @@ export async function clearSession(session: Awaited<ReturnType<typeof getSession
   session.deviceStatus = undefined;
   session.technicianId = undefined;
   session.technicianName = undefined;
+  session.isPlatformAdmin = undefined;
   await session.save();
 }

@@ -57,12 +57,31 @@ export function CreatableSelect({
   const options = externalOptions ?? internalOptions;
 
   const loadOptions = useCallback(async () => {
+    if (category === "brand" || category === "complaint") {
+      if (!applianceType) {
+        setInternalOptions([]);
+        return [];
+      }
+      const res = await fetch(
+        `/api/appliance-lookups?applianceType=${encodeURIComponent(applianceType)}`
+      );
+      const data = await res.json();
+      const values =
+        category === "brand"
+          ? ((data.brands as string[] | undefined) ?? [])
+          : ((data.complaints as string[] | undefined) ?? []);
+      setInternalOptions(values);
+      return values;
+    }
+
     const res = await fetch(`/api/lookups?category=${category}`);
     const data = await res.json();
-    const values = data.map((o: { value: string }) => o.value);
+    const values = Array.isArray(data)
+      ? data.map((o: { value: string }) => o.value)
+      : [];
     setInternalOptions(values);
     return values;
-  }, [category]);
+  }, [category, applianceType]);
 
   useEffect(() => {
     if (externalOptions != null) return;

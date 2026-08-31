@@ -248,6 +248,7 @@ export function formatStatusChangedBy(changedBy: string | null | undefined): str
   if (lower === "reception") return "Reception";
   if (lower === "admin") return "Admin";
   if (lower === "technician") return "Technician";
+  if (lower === "verifier") return "Verifier";
   return changedBy;
 }
 
@@ -263,5 +264,6 @@ export function staffActorName(session: {
   if (session.role === "reception") return "Reception";
   if (session.role === "admin") return "Admin";
   if (session.role === "technician") return "Technician";
+  if (session.role === "verifier") return "Verifier";
   return "Staff";
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { requireTenantId } from "@/lib/tenant";
 import { slugify } from "@/lib/tenant";
+import { todayIstDate } from "@/lib/tokens";
 
 export async function GET() {
   const session = await getSession();
@@ -10,7 +11,10 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const tenantId = requireTenantId(session);
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    include: { tokenSequence: { select: { lastNum: true, lastResetOn: true } } },
+  });
   if (!tenant) {
     return NextResponse.json({ error: "Shop not found" }, { status: 404 });
   }
@@ -21,6 +25,9 @@ export async function GET() {
     phone: tenant.phone ?? "",
     logoUrl: tenant.logoUrl,
     jobPrefix: tenant.jobPrefix,
+    tokenPrefix: tenant.tokenPrefix,
+    tokenResetDaily: tenant.tokenResetDaily,
+    tokenLastNum: tenant.tokenSequence?.lastNum ?? 0,
     status: tenant.status,
   });
 }
@@ -41,6 +48,8 @@ export async function PATCH(request: NextRequest) {
     phone?: string;
     logoUrl?: string | null;
     jobPrefix?: string;
+    tokenPrefix?: string;
+    tokenResetDaily?: boolean;
   } = {};
 
   if (typeof body.name === "string" && body.name.trim()) {
@@ -62,6 +71,19 @@ export async function PATCH(request: NextRequest) {
     }
     data.jobPrefix = prefix;
   }
+  if (typeof body.tokenPrefix === "string") {
+    const prefix = body.tokenPrefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (prefix.length < 1 || prefix.length > 6) {
+      return NextResponse.json(
+        { error: "Token prefix must be 1–6 letters/numbers" },
+        { status: 400 }
+      );
+    }
+    data.tokenPrefix = prefix;
+  }
+  if (typeof body.tokenResetDaily === "boolean") {
+    data.tokenResetDaily = body.tokenResetDaily;
+  }
 
   // slug changes are sensitive; allow only via dedicated field with uniqueness check
   let nextSlug: string | undefined;
@@ -79,12 +101,21 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
+  if (body.resetTokenSequence === true) {
+    await prisma.tokenSequence.upsert({
+      where: { tenantId },
+      update: { lastNum: 0, lastResetOn: todayIstDate() },
+      create: { tenantId, lastNum: 0, lastResetOn: todayIstDate() },
+    });
+  }
+
   const tenant = await prisma.tenant.update({
     where: { id: tenantId },
     data: {
       ...data,
       ...(nextSlug ? { slug: nextSlug } : {}),
     },
+    include: { tokenSequence: { select: { lastNum: true, lastResetOn: true } } },
   });
 
   session.tenantSlug = tenant.slug;
@@ -98,6 +129,9 @@ export async function PATCH(request: NextRequest) {
     phone: tenant.phone ?? "",
     logoUrl: tenant.logoUrl,
     jobPrefix: tenant.jobPrefix,
+    tokenPrefix: tenant.tokenPrefix,
+    tokenResetDaily: tenant.tokenResetDaily,
+    tokenLastNum: tenant.tokenSequence?.lastNum ?? 0,
     status: tenant.status,
   });
 }

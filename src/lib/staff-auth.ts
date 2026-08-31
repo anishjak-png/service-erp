@@ -91,5 +91,5 @@ export async function upsertStaffDevice(params: {
 }
 
 export function staffRoleToSessionRole(role: StaffRole) {
-  return role as "reception" | "technician" | "admin";
+  return role as "reception" | "technician" | "admin" | "verifier";
 }

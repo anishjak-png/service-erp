@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { countPendingDevices } from "@/lib/staff-auth";
+import { countUnreadAlerts } from "@/lib/staff-alerts";
 import { clearSession, getSession, isDeviceApproved } from "@/lib/session";
 
 export async function GET() {
@@ -12,7 +13,7 @@ export async function GET() {
 
   const staffUser = await prisma.staffUser.findUnique({
     where: { id: session.staffUserId },
-    include: { technician: true },
+    include: { technician: true, tenant: { select: { name: true } } },
   });
 
   if (!staffUser || !staffUser.active) {
@@ -63,6 +64,7 @@ export async function GET() {
     staffName: staffUser.name,
     staffUserId: staffUser.id,
     tenantId: staffUser.tenantId,
+    tenantName: staffUser.tenant?.name ?? session.tenantName ?? null,
     deviceStatus: session.deviceStatus ?? "pending",
     deviceApproved: isDeviceApproved(session),
     technicianId: session.technicianId ?? staffUser.technicianId,
@@ -72,6 +74,16 @@ export async function GET() {
 
   if (session.role === "admin" && isDeviceApproved(session)) {
     payload.pendingDeviceCount = await countPendingDevices(staffUser.tenantId);
+  }
+
+  if (
+    (session.role === "verifier" || session.role === "admin") &&
+    isDeviceApproved(session)
+  ) {
+    payload.unreadAlertCount = await countUnreadAlerts(
+      staffUser.tenantId,
+      session.role
+    );
   }
 
   return NextResponse.json(payload);

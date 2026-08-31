@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 
 type ShopSettings = {
   id: string;
@@ -9,20 +10,28 @@ type ShopSettings = {
   phone: string;
   logoUrl: string | null;
   jobPrefix: string;
+  tokenPrefix: string;
+  tokenResetDaily: boolean;
+  tokenLastNum: number;
   status: string;
 };
 
 export function ShopSettingsTab() {
+  const { refreshAuth } = useAuth();
   const [shop, setShop] = useState<ShopSettings | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [slug, setSlug] = useState("");
   const [jobPrefix, setJobPrefix] = useState("SE");
+  const [tokenPrefix, setTokenPrefix] = useState("TK");
+  const [tokenResetDaily, setTokenResetDaily] = useState(false);
+  const [tokenLastNum, setTokenLastNum] = useState(0);
   const [logoUrl, setLogoUrl] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +49,9 @@ export function ShopSettingsTab() {
       setPhone(data.phone ?? "");
       setSlug(data.slug ?? "");
       setJobPrefix(data.jobPrefix ?? "SE");
+      setTokenPrefix(data.tokenPrefix ?? "TK");
+      setTokenResetDaily(Boolean(data.tokenResetDaily));
+      setTokenLastNum(data.tokenLastNum ?? 0);
       setLogoUrl(data.logoUrl ?? "");
       setLoading(false);
     })();
@@ -61,6 +73,8 @@ export function ShopSettingsTab() {
         phone,
         slug,
         jobPrefix,
+        tokenPrefix,
+        tokenResetDaily,
         logoUrl: logoUrl.trim() || null,
       }),
     });
@@ -71,7 +85,36 @@ export function ShopSettingsTab() {
       return;
     }
     setShop(data);
+    setTokenLastNum(data.tokenLastNum ?? 0);
     setSaved("Shop settings saved.");
+    await refreshAuth();
+  }
+
+  async function handleResetTokenSequence() {
+    if (
+      !confirm(
+        "Reset the token counter? The next token will start from 1."
+      )
+    ) {
+      return;
+    }
+    setResetting(true);
+    setError("");
+    setSaved("");
+    const res = await fetch("/api/admin/shop", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resetTokenSequence: true }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setResetting(false);
+    if (!res.ok) {
+      setError(data.error ?? "Reset failed");
+      return;
+    }
+    setShop(data);
+    setTokenLastNum(data.tokenLastNum ?? 0);
+    setSaved("Token counter reset. Next token will be 1.");
   }
 
   if (loading) {
@@ -107,16 +150,6 @@ export function ShopSettingsTab() {
       </label>
 
       <label className="block text-xs font-medium text-slate-600">
-        URL slug
-        <input
-          value={slug}
-          onChange={(e) => setSlug(e.target.value.toLowerCase())}
-          className="mt-1 flex h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
-          required
-        />
-      </label>
-
-      <label className="block text-xs font-medium text-slate-600">
         Job number prefix
         <input
           value={jobPrefix}
@@ -126,6 +159,48 @@ export function ShopSettingsTab() {
           required
         />
       </label>
+
+      <label className="block text-xs font-medium text-slate-600">
+        Token number prefix
+        <input
+          value={tokenPrefix}
+          onChange={(e) => setTokenPrefix(e.target.value.toUpperCase())}
+          maxLength={6}
+          className="mt-1 flex h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+          required
+        />
+      </label>
+
+      <label className="flex items-start gap-2 text-xs font-medium text-slate-600">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={tokenResetDaily}
+          onChange={(e) => setTokenResetDaily(e.target.checked)}
+        />
+        <span>
+          Reset token numbers daily
+          <span className="mt-0.5 block font-normal text-slate-500">
+            Starts from 1 each morning. The date is added so numbers stay unique
+            (e.g. {tokenPrefix || "TK"} 3008 1).
+          </span>
+        </span>
+      </label>
+
+      <div className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+        <p className="text-xs text-slate-600">
+          Last token number:{" "}
+          <span className="font-medium text-slate-800">{tokenLastNum}</span>
+        </p>
+        <button
+          type="button"
+          onClick={handleResetTokenSequence}
+          disabled={resetting || saving}
+          className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+        >
+          {resetting ? "Resetting…" : "Reset now"}
+        </button>
+      </div>
 
       <label className="block text-xs font-medium text-slate-600">
         Logo URL (optional)
@@ -139,7 +214,7 @@ export function ShopSettingsTab() {
 
       {shop && (
         <p className="text-xs text-slate-500">
-          Status: {shop.status} · Sign-in tip: use slug <span className="font-mono">{shop.slug}</span>
+          Status: {shop.status} · Sign in with shop name <span className="font-medium">{shop.name}</span>
         </p>
       )}
 

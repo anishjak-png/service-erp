@@ -111,14 +111,14 @@ function LoginForm() {
                 htmlFor="tenantSlug"
                 className="text-sm font-medium text-slate-700"
               >
-                Shop slug (optional if unique mobile)
+                Shop name (optional if unique mobile)
               </label>
               <input
                 id="tenantSlug"
                 type="text"
                 value={tenantSlug}
-                onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
-                placeholder="e.g. demo"
+                onChange={(e) => setTenantSlug(e.target.value)}
+                placeholder="e.g. UMA TRADERS"
                 className="flex h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               />
             </div>
@@ -175,11 +175,6 @@ function LoginForm() {
 
           <p className="mt-4 text-center text-xs text-slate-400">
             New device? Admin must approve after first login.
-          </p>
-          <p className="mt-3 text-center text-sm">
-            <a href="/signup" className="font-medium text-emerald-700 hover:underline">
-              New shop? Create an account
-            </a>
           </p>
           <p className="mt-3 text-center text-sm">
             <a href="/track" className="font-medium text-emerald-700 hover:underline">

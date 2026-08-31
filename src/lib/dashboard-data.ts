@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sumBillSplits } from "@/lib/currency";
 
 function todayRange() {
   const today = new Date();
@@ -36,6 +37,8 @@ const readyPickupSelect = {
   applianceType: true,
   readyAt: true,
   serviceAmount: true,
+  serviceCharge: true,
+  sparesAmount: true,
   deliveryContactStatus: true,
   expectedDeliveryAt: true,
   customer: { select: { name: true, mobile: true } },
@@ -55,20 +58,25 @@ function sortReadyForPickup<T extends { jobNumber: string }>(jobs: T[]): T[] {
   );
 }
 
-export async function getReceptionDashboardData() {
+export async function getReceptionDashboardData(tenantId: string) {
   const { today, tomorrow } = todayRange();
+  const tenantFilter = { tenantId };
 
-  const [todayJobs, statusGroups, readyRows] = await Promise.all([
+  const [todayJobs, statusGroups, readyRows, pendingTokens] = await Promise.all([
     prisma.jobCard.count({
-      where: { receivedAt: { gte: today, lt: tomorrow } },
+      where: { ...tenantFilter, receivedAt: { gte: today, lt: tomorrow } },
     }),
     prisma.jobCard.groupBy({
       by: ["status"],
       _count: { id: true },
+      where: tenantFilter,
     }),
     prisma.jobCard.findMany({
-      where: { status: "Ready" },
+      where: { ...tenantFilter, status: "Ready" },
       select: readyPickupSelect,
+    }),
+    prisma.tokenCard.count({
+      where: { ...tenantFilter, status: "Pending" },
     }),
   ]);
 
@@ -76,6 +84,7 @@ export async function getReceptionDashboardData() {
 
   return {
     todayJobs,
+    pendingTokens,
     ...counts,
     readyForPickup: sortReadyForPickup(readyRows).map((j) => ({
       ...j,
@@ -85,48 +94,72 @@ export async function getReceptionDashboardData() {
   };
 }
 
-export async function getAdminDashboardData() {
+export async function getAdminDashboardData(tenantId: string) {
   const { today, tomorrow } = todayRange();
   const { monthStart, nextMonth } = monthRange();
+  const tenantFilter = { tenantId };
 
-  const [todayJobs, statusGroups, todayCollection, monthlyCollection, readyCollection, readyRows] =
+  const [todayJobs, statusGroups, todayDelivered, monthlyDelivered, readyRows, pendingTokens] =
     await Promise.all([
       prisma.jobCard.count({
-        where: { receivedAt: { gte: today, lt: tomorrow } },
+        where: { ...tenantFilter, receivedAt: { gte: today, lt: tomorrow } },
       }),
       prisma.jobCard.groupBy({
         by: ["status"],
         _count: { id: true },
+        where: tenantFilter,
       }),
-      prisma.jobCard.aggregate({
-        where: { status: "Delivered", deliveredAt: { gte: today, lt: tomorrow } },
-        _sum: { serviceAmount: true },
-      }),
-      prisma.jobCard.aggregate({
+      prisma.jobCard.findMany({
         where: {
+          ...tenantFilter,
+          status: "Delivered",
+          deliveredAt: { gte: today, lt: tomorrow },
+        },
+        select: {
+          serviceAmount: true,
+          serviceCharge: true,
+          sparesAmount: true,
+        },
+      }),
+      prisma.jobCard.findMany({
+        where: {
+          ...tenantFilter,
           status: "Delivered",
           deliveredAt: { gte: monthStart, lt: nextMonth },
         },
-        _sum: { serviceAmount: true },
-      }),
-      prisma.jobCard.aggregate({
-        where: { status: "Ready" },
-        _sum: { serviceAmount: true },
+        select: {
+          serviceAmount: true,
+          serviceCharge: true,
+          sparesAmount: true,
+        },
       }),
       prisma.jobCard.findMany({
-        where: { status: "Ready" },
+        where: { ...tenantFilter, status: "Ready" },
         select: readyPickupSelect,
+      }),
+      prisma.tokenCard.count({
+        where: { ...tenantFilter, status: "Pending" },
       }),
     ]);
 
   const counts = countsFromGroups(statusGroups);
+  const todaySplit = sumBillSplits(todayDelivered);
+  const monthlySplit = sumBillSplits(monthlyDelivered);
+  const readySplit = sumBillSplits(readyRows);
 
   return {
     todayJobs,
+    pendingTokens,
     ...counts,
-    todayCollection: todayCollection._sum.serviceAmount ?? 0,
-    monthlyCollection: monthlyCollection._sum.serviceAmount ?? 0,
-    pendingCollection: readyCollection._sum.serviceAmount ?? 0,
+    todayCollection: todaySplit.totalCollection,
+    todayServiceCharge: todaySplit.serviceChargeTotal,
+    todaySparesAmount: todaySplit.sparesAmountTotal,
+    monthlyCollection: monthlySplit.totalCollection,
+    monthlyServiceCharge: monthlySplit.serviceChargeTotal,
+    monthlySparesAmount: monthlySplit.sparesAmountTotal,
+    pendingCollection: readySplit.totalCollection,
+    pendingServiceCharge: readySplit.serviceChargeTotal,
+    pendingSparesAmount: readySplit.sparesAmountTotal,
     readyForPickup: sortReadyForPickup(readyRows).map((j) => ({
       ...j,
       readyAt: j.readyAt?.toISOString() ?? null,

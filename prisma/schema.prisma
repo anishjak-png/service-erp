@@ -14,12 +14,15 @@ model Tenant {
   name      String
   phone     String   @default("")
   logoUrl   String?
-  jobPrefix String   @default("SE")
-  status    String   @default("active") // active|suspended
+  jobPrefix       String  @default("SE")
+  tokenPrefix     String  @default("TK")
+  tokenResetDaily Boolean @default(false)
+  status          String  @default("active") // active|suspended
   createdAt DateTime @default(now())
 
   customers             Customer[]
   jobCards              JobCard[]
+  tokenCards            TokenCard[]
   technicians           Technician[]
   staffUsers            StaffUser[]
   staffDevices          StaffDevice[]
@@ -30,12 +33,15 @@ model Tenant {
   applianceComplaints   ApplianceComplaint[]
   outsourcePartners     OutsourcePartner[]
   printJobs             PrintJob[]
+  shopPrinters          ShopPrinter[]
+  staffAlerts           StaffAlert[]
   notificationSettings  NotificationSettings?
   notificationTemplates NotificationTemplate[]
   notificationLogs      NotificationLog[]
   whatsAppConversations WhatsAppConversation[]
   whatsAppMessages      WhatsAppMessage[]
   jobSequence           JobSequence?
+  tokenSequence         TokenSequence?
 }
 
 model Customer {
@@ -49,6 +55,7 @@ model Customer {
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
   jobCards                   JobCard[]
+  tokenCards                 TokenCard[]
   whatsAppConversations      WhatsAppConversation[]
 
   @@unique([tenantId, mobile])
@@ -61,6 +68,7 @@ enum JobStatus {
   Outsourced
   WarrantyPending
   WarrantyWithCompany
+  JobCompleted
   Ready
   Return
   Delivered
@@ -90,6 +98,8 @@ model Technician {
   active            Boolean               @default(true)
   assignedJobs      JobCard[]             @relation("AssignedTechnician")
   completedJobs     JobCard[]             @relation("CompletedByTechnician")
+  assignedTokens    TokenCard[]           @relation("AssignedTokenTechnician")
+  completedTokens   TokenCard[]           @relation("CompletedTokenTechnician")
   applianceMappings ApplianceTechnician[]
   staffUsers        StaffUser[]
   createdAt         DateTime              @default(now())
@@ -102,6 +112,7 @@ enum StaffRole {
   reception
   technician
   admin
+  verifier
 }
 
 enum DevicePlatform {
@@ -234,10 +245,15 @@ model JobCard {
   warrantyCardPhotos            String?
   accessories                   String?
   serviceAmount                 Float?
+  serviceCharge                 Float?
+  serviceKind                   String?
+  sparesAmount                  Float?
   status                        JobStatus             @default(Pending)
   remarks                       String?
   whatsappNotificationsOverride Boolean?
+  rackDetail                    String?
   receivedAt                    DateTime              @default(now())
+  completedAt                   DateTime?
   readyAt                       DateTime?
   deliveredAt                   DateTime?
   deliveryContactStatus         DeliveryContactStatus @default(not_contacted)
@@ -259,6 +275,7 @@ model JobCard {
   updatedAt                     DateTime              @updatedAt
   statusHistory                 StatusHistory[]
   printJobs                     PrintJob[]
+  staffAlerts                   StaffAlert[]
   notificationLogs              NotificationLog[]
   whatsAppMessages              WhatsAppMessage[]
 
@@ -296,6 +313,98 @@ model JobSequence {
   lastNum  Int    @default(0)
 }
 
+enum TokenStatus {
+  Pending
+  JobCompleted
+  Ready
+  Delivered
+}
+
+model TokenSequence {
+  id          String  @id @default(cuid())
+  tenantId    String  @unique
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lastNum     Int     @default(0)
+  lastResetOn String?
+}
+
+model TokenCard {
+  id                      String      @id @default(cuid())
+  tenantId                String
+  tenant                  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tokenNumber             String
+  customerId              String
+  customer                Customer    @relation(fields: [customerId], references: [id])
+  applianceType           String
+  brand                   String
+  model                   String?
+  complaint               String
+  physicalCondition       String?
+  productPhotos           String?
+  accessories             String?
+  remarks                 String?
+  serviceAmount           Float?
+  serviceCharge           Float?
+  serviceKind             String?
+  sparesAmount            Float?
+  status                  TokenStatus @default(Pending)
+  estimatedMinutes        Int
+  receivedAt              DateTime    @default(now())
+  completedAt             DateTime?
+  readyAt                 DateTime?
+  deliveredAt             DateTime?
+  createdBy               String?
+  assignedTechnicianId    String?
+  assignedTechnician      Technician? @relation("AssignedTokenTechnician", fields: [assignedTechnicianId], references: [id])
+  completedByTechnicianId String?
+  completedByTechnician   Technician? @relation("CompletedTokenTechnician", fields: [completedByTechnicianId], references: [id])
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  printJobs               PrintJob[]
+  staffAlerts             StaffAlert[]
+
+  @@unique([tenantId, tokenNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@index([assignedTechnicianId])
+  @@index([receivedAt])
+}
+
+model StaffAlert {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role       StaffRole?
+  userId     String?
+  type       String
+  title      String
+  body       String?
+  jobCardId  String?
+  jobCard    JobCard?  @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  tokenId    String?
+  tokenCard  TokenCard? @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId, role, readAt])
+  @@index([tenantId, createdAt])
+}
+
+model ShopPrinter {
+  id        String  @id @default(cuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  printerId String
+  purposes  String  @default("[\"job_receipt\"]")
+  active    Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, printerId])
+  @@index([tenantId])
+}
+
 enum PrintJobStatus {
   Pending
   Printing
@@ -309,6 +418,8 @@ model PrintJob {
   tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   jobCardId    String?
   jobCard      JobCard?       @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  tokenCardId  String?
+  tokenCard    TokenCard?     @relation(fields: [tokenCardId], references: [id], onDelete: Cascade)
   type         String         @default("receipt")
   payload      Json?
   status       PrintJobStatus @default(Pending)

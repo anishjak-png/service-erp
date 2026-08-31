@@ -7,6 +7,7 @@ import {
   getReceptionDashboardData,
 } from "@/lib/dashboard-data";
 import { getSession } from "@/lib/session";
+import { requireTenantId } from "@/lib/tenant";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -19,8 +20,14 @@ export default async function DashboardPage() {
     redirect("/jobs/pending?scope=my");
   }
 
+  if (session.role === "verifier") {
+    redirect("/jobs/ready");
+  }
+
+  const tenantId = requireTenantId(session);
+
   if (session.role === "admin") {
-    const data = await getAdminDashboardData();
+    const data = await getAdminDashboardData(tenantId);
     return (
       <AppShell>
         <AdminDashboard data={data} />
@@ -28,7 +35,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const data = await getReceptionDashboardData();
+  const data = await getReceptionDashboardData(tenantId);
   return (
     <AppShell>
       <ReceptionDashboard data={data} />

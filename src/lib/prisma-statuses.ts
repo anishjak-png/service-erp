@@ -6,6 +6,7 @@ const ACTIVE_STATUS_VALUES = [
   "Outsourced",
   "WarrantyPending",
   "WarrantyWithCompany",
+  "JobCompleted",
   "Ready",
   "Return",
 ] as const;
@@ -14,7 +15,6 @@ const ACTIVE_STATUS_VALUES = [
 const TECH_MY_BOARD_STATUS_VALUES = [
   "Pending",
   "WaitingForCustomerApproval",
-  "Ready",
   "Return",
 ] as const;
 

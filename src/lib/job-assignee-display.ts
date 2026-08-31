@@ -1,4 +1,4 @@
-type StaffRole = "admin" | "reception" | "technician" | null;
+type StaffRole = "admin" | "reception" | "technician" | "verifier" | null;
 
 export function shouldShowJobAssignee(
   status: string,
@@ -30,6 +30,6 @@ export function shouldShowJobServiceAmount(
   showServiceAmount: boolean
 ): boolean {
   if (serviceAmount == null) return false;
-  if (status === "Ready" || status === "Return") return true;
+  if (status === "Ready" || status === "Return" || status === "JobCompleted") return true;
   return showServiceAmount;
 }

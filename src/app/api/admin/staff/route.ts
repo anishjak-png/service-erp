@@ -13,28 +13,36 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const staff = await prisma.staffUser.findMany({
-    where: { tenantId: session.tenantId },
-    orderBy: [{ role: "asc" }, { name: "asc" }],
-    include: {
-      technician: { select: { id: true, name: true } },
-      _count: { select: { devices: true } },
-    },
-  });
+  try {
+    const staff = await prisma.staffUser.findMany({
+      where: { tenantId: session.tenantId },
+      orderBy: [{ role: "asc" }, { name: "asc" }],
+      include: {
+        technician: { select: { id: true, name: true } },
+        _count: { select: { devices: true } },
+      },
+    });
 
-  return NextResponse.json({
-    staff: staff.map((s) => ({
-      id: s.id,
-      mobile: s.mobile,
-      name: s.name,
-      role: s.role,
-      active: s.active,
-      technicianId: s.technicianId,
-      technicianName: s.technician?.name ?? null,
-      deviceCount: s._count.devices,
-      createdAt: s.createdAt,
-    })),
-  });
+    return NextResponse.json({
+      staff: staff.map((s) => ({
+        id: s.id,
+        mobile: s.mobile,
+        name: s.name,
+        role: s.role,
+        active: s.active,
+        technicianId: s.technicianId,
+        technicianName: s.technician?.name ?? null,
+        deviceCount: s._count.devices,
+        createdAt: s.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("GET /api/admin/staff failed:", error);
+    return NextResponse.json(
+      { error: "Could not reach the database. Refresh and try again." },
+      { status: 503 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -62,7 +70,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid mobile number" }, { status: 400 });
   }
 
-  if (!["reception", "technician", "admin"].includes(role)) {
+  if (!["reception", "technician", "admin", "verifier"].includes(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 

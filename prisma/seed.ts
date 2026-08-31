@@ -27,6 +27,7 @@ async function main() {
     update: {
       name: "Demo Shop",
       jobPrefix: "SE",
+      tokenPrefix: "TK",
       status: "active",
       phone: "",
     },
@@ -34,6 +35,7 @@ async function main() {
       slug: "demo",
       name: "Demo Shop",
       jobPrefix: "SE",
+      tokenPrefix: "TK",
       status: "active",
       phone: "",
     },

@@ -13,13 +13,16 @@ import { JobNotificationSettings } from "@/components/JobNotificationSettings";
 import {
   getSelectableStatuses,
   isDeliveredTerminal,
+  isServiceKind,
   MAX_PRODUCT_PHOTOS,
   MAX_WARRANTY_CARD_PHOTOS,
+  serviceKindLabel,
   STATUS_LABELS,
   type JobStatusValue,
+  type ServiceKind,
   type StaffRole,
 } from "@/lib/constants";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, formatBillSplitLine } from "@/lib/currency";
 import {
   daysSince,
   formatMobileDisplay,
@@ -55,6 +58,11 @@ type JobDetail = {
   warrantyCardPhotos?: string | null;
   remarks?: string | null;
   serviceAmount?: number | null;
+  serviceCharge?: number | null;
+  serviceKind?: string | null;
+  sparesAmount?: number | null;
+  rackDetail?: string | null;
+  completedAt?: string | null;
   deliveryContactStatus?: "not_contacted" | "contacted";
   expectedDeliveryAt?: string | null;
   receivedAt: string;
@@ -138,6 +146,11 @@ function CompactCard({
   );
 }
 
+function amountInputValue(amount: number | null | undefined): string {
+  if (amount == null || amount === 0) return "";
+  return String(amount);
+}
+
 function CompactRow({
   label,
   children,
@@ -167,6 +180,7 @@ function CompactRow({
 }
 
 const STATUS_ACTION_ORDER: JobStatusValue[] = [
+  "JobCompleted",
   "Ready",
   "WaitingForCustomerApproval",
   "Return",
@@ -199,6 +213,7 @@ function formatAccessoryWithQty(item: AccessoryItem): string {
 }
 
 const STATUS_ACTION_LABELS: Partial<Record<JobStatusValue, string>> = {
+  JobCompleted: "Job Completed",
   Ready: "Ready",
   WaitingForCustomerApproval: "Waiting for approval",
   Return: "Return",
@@ -209,16 +224,26 @@ const STATUS_ACTION_LABELS: Partial<Record<JobStatusValue, string>> = {
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { role, loaded: authLoaded } = useAuth();
+  const { role, technicianId, loaded: authLoaded } = useAuth();
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [remarks, setRemarks] = useState("");
-  const [readyAmount, setReadyAmount] = useState("");
+  const [readyServiceCharge, setReadyServiceCharge] = useState("");
+  const [readyServiceKind, setReadyServiceKind] = useState<ServiceKind | "">("");
+  const [readySparesAmount, setReadySparesAmount] = useState("");
   const [readyCompletedById, setReadyCompletedById] = useState("");
   const [showReadyForm, setShowReadyForm] = useState(false);
+  const [readyShowErrors, setReadyShowErrors] = useState(false);
+  const [showVerifyReadyForm, setShowVerifyReadyForm] = useState(false);
+  const [rackDetail, setRackDetail] = useState("");
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [returnNote, setReturnNote] = useState("");
   const [showAmountEdit, setShowAmountEdit] = useState(false);
-  const [editAmount, setEditAmount] = useState("");
+  const [editShowErrors, setEditShowErrors] = useState(false);
+  const [editServiceCharge, setEditServiceCharge] = useState("");
+  const [editServiceKind, setEditServiceKind] = useState<ServiceKind | "">("");
+  const [editSparesAmount, setEditSparesAmount] = useState("");
   const [technicians, setTechnicians] = useState<Array<{ id: string; name: string }>>([]);
   const [editCompletedById, setEditCompletedById] = useState("");
   const [showCompletedByEdit, setShowCompletedByEdit] = useState(false);
@@ -274,8 +299,29 @@ export default function JobDetailPage() {
     const data = await jobRes.json();
     setJob(data);
     setRemarks(data.remarks ?? "");
-    setReadyAmount(data.serviceAmount != null ? String(data.serviceAmount) : "");
-    setEditAmount(data.serviceAmount != null ? String(data.serviceAmount) : "");
+    setReadyServiceCharge(
+      amountInputValue(
+        data.serviceCharge != null
+          ? data.serviceCharge
+          : data.sparesAmount == null
+            ? data.serviceAmount
+            : null
+      )
+    );
+    setReadySparesAmount(amountInputValue(data.sparesAmount));
+    setReadyServiceKind(isServiceKind(data.serviceKind) ? data.serviceKind : "");
+    setEditServiceCharge(
+      amountInputValue(
+        data.serviceCharge != null
+          ? data.serviceCharge
+          : data.sparesAmount == null
+            ? data.serviceAmount
+            : null
+      )
+    );
+    setEditSparesAmount(amountInputValue(data.sparesAmount));
+    setEditServiceKind(isServiceKind(data.serviceKind) ? data.serviceKind : "");
+    setRackDetail(data.rackDetail ?? "");
     setEditCompletedById(data.completedByTechnician?.id ?? "");
     setEditAssigneeId(data.assignedTechnician?.id ?? "");
     setPurchaseDateEdit(toDateInputValue(data.warrantyPurchaseDate));
@@ -309,7 +355,7 @@ export default function JobDetailPage() {
   }, [job?.applianceType]);
 
   useEffect(() => {
-    if (role === "reception" || role === "admin") {
+    if (role === "reception" || role === "admin" || role === "technician") {
       fetch("/api/technicians")
         .then((r) => r.json())
         .then((data) => {
@@ -333,8 +379,25 @@ export default function JobDetailPage() {
       const data = (await res.json()) as JobPatchResponse;
       setJob((prev) => (prev ? mergeJobPatch(prev, data) : prev));
       if (data.remarks !== undefined) setRemarks(data.remarks ?? "");
+      if (data.serviceCharge !== undefined || data.sparesAmount !== undefined) {
+        setEditServiceCharge(amountInputValue(data.serviceCharge));
+        setEditSparesAmount(amountInputValue(data.sparesAmount));
+        setReadyServiceCharge(amountInputValue(data.serviceCharge));
+        setReadySparesAmount(amountInputValue(data.sparesAmount));
+      }
+      if (data.serviceKind !== undefined) {
+        const kind = isServiceKind(data.serviceKind) ? data.serviceKind : "";
+        setEditServiceKind(kind);
+        setReadyServiceKind(kind);
+      }
       setShowReadyForm(false);
+      setReadyShowErrors(false);
+      setShowVerifyReadyForm(false);
+      if (data.rackDetail !== undefined) setRackDetail(data.rackDetail ?? "");
+      setShowReturnForm(false);
+      setReturnNote("");
       setShowAmountEdit(false);
+      setEditShowErrors(false);
       setShowOutsourceForm(false);
       setShowConvertWarrantyForm(false);
       setShowAssigneeEdit(false);
@@ -368,20 +431,58 @@ export default function JobDetailPage() {
       setShowConvertWarrantyForm(true);
       return;
     }
-    if (status === "Ready") {
-      if (job?.readyAt && role !== "admin") {
-        await updateJob({ status: "Ready" });
+    if (status === "JobCompleted") {
+      if (job?.completedAt && role !== "admin") {
+        await updateJob({ status: "JobCompleted" });
         return;
       }
-      setReadyCompletedById(job?.assignedTechnician?.id ?? "");
+      setReadyCompletedById(
+        job?.completedByTechnician?.id ??
+          technicianId ??
+          job?.assignedTechnician?.id ??
+          ""
+      );
+      setReadyServiceCharge(
+        amountInputValue(
+          job?.serviceCharge != null
+            ? job.serviceCharge
+            : job?.sparesAmount == null
+              ? job?.serviceAmount
+              : null
+        )
+      );
+      setReadySparesAmount(amountInputValue(job?.sparesAmount));
+      setReadyShowErrors(false);
       setShowReadyForm(true);
       return;
     }
+    if (status === "Ready") {
+      if (role !== "verifier" && role !== "admin") return;
+      setRackDetail(job?.rackDetail ?? "");
+      setShowVerifyReadyForm(true);
+      return;
+    }
     if (status === "Return") {
-      await updateJob({ status, serviceAmount: 0 });
+      setReturnNote("");
+      setShowReturnForm(true);
       return;
     }
     await updateJob({ status });
+  }
+
+  async function confirmReturn() {
+    const note = returnNote.trim();
+    if (!note) {
+      alert("Enter a note explaining the return");
+      return;
+    }
+    await updateJob({
+      status: "Return",
+      note,
+      serviceAmount: 0,
+      serviceCharge: 0,
+      sparesAmount: 0,
+    });
   }
 
   async function confirmOutsource() {
@@ -442,22 +543,36 @@ export default function JobDetailPage() {
   }
 
   async function confirmReady() {
-    const amount = Number(readyAmount);
-    if (Number.isNaN(amount) || amount < 0) {
-      alert("Enter a valid service amount");
+    const chargeMissing = readyServiceCharge.trim() === "";
+    const kindMissing = !isServiceKind(readyServiceKind);
+    if (chargeMissing || kindMissing) {
+      setReadyShowErrors(true);
+      return;
+    }
+    const serviceCharge = Number(readyServiceCharge);
+    const sparesAmount =
+      readySparesAmount.trim() === "" ? 0 : Number(readySparesAmount);
+    if (
+      Number.isNaN(serviceCharge) ||
+      serviceCharge < 0 ||
+      Number.isNaN(sparesAmount) ||
+      sparesAmount < 0
+    ) {
+      alert("Enter valid amounts (0 or more)");
       return;
     }
     const updates: Record<string, unknown> = {
-      status: "Ready",
-      serviceAmount: amount,
+      status: "JobCompleted",
+      serviceCharge,
+      serviceKind: readyServiceKind,
+      sparesAmount,
     };
     const fromWarranty =
       job?.isWarranty ||
       job?.status === "WarrantyPending" ||
       job?.status === "WarrantyWithCompany";
     if (
-      (role === "reception" || role === "admin") &&
-      !job?.completedByTechnician &&
+      (role === "reception" || role === "admin" || role === "technician") &&
       job?.status !== "Outsourced" &&
       !fromWarranty
     ) {
@@ -470,17 +585,40 @@ export default function JobDetailPage() {
     await updateJob(updates);
   }
 
+  async function confirmVerifierReady() {
+    const rack = rackDetail.trim();
+    if (!rack) {
+      alert("Enter the rack where the product is placed");
+      return;
+    }
+    await updateJob({ status: "Ready", rackDetail: rack });
+  }
+
   async function handleSaveRemarks() {
     await updateJob({ remarks });
   }
 
   async function handleSaveAmount() {
-    const amount = Number(editAmount);
-    if (Number.isNaN(amount) || amount < 0) {
-      alert("Enter a valid service amount");
+    const chargeMissing = editServiceCharge.trim() === "";
+    const kindMissing = !isServiceKind(editServiceKind);
+    if (chargeMissing || kindMissing) {
+      setEditShowErrors(true);
       return;
     }
-    await updateJob({ serviceAmount: amount });
+    const serviceCharge = Number(editServiceCharge);
+    const sparesAmount =
+      editSparesAmount.trim() === "" ? 0 : Number(editSparesAmount);
+    if (
+      Number.isNaN(serviceCharge) ||
+      serviceCharge < 0 ||
+      Number.isNaN(sparesAmount) ||
+      sparesAmount < 0
+    ) {
+      alert("Enter valid amounts (0 or more)");
+      return;
+    }
+    await updateJob({ serviceCharge, serviceKind: editServiceKind, sparesAmount });
+    setShowAmountEdit(false);
   }
 
   async function handleSaveCompletedBy() {
@@ -625,6 +763,9 @@ export default function JobDetailPage() {
     job.status as JobStatusValue,
     staffRole,
     { isWarranty: Boolean(job.isWarranty) }
+  ).filter(
+    (status) =>
+      status !== "Ready" || role === "verifier" || role === "admin"
   );
   const canConvertToWarranty =
     !job.isWarranty && selectableStatuses.includes("WarrantyPending");
@@ -640,9 +781,12 @@ export default function JobDetailPage() {
   const warrantyCardPhotos = parseWarrantyCardPhotos(job.warrantyCardPhotos);
   const isStaff = role === "reception" || role === "admin";
   const isAdmin = role === "admin";
-  const showFinancials = isStaff || isAdmin;
+  // Technicians see the Ready total on detail (they enter it); lists still hide amounts.
+  const showFinancials =
+    role === "technician" || role === "reception" || role === "admin";
   const isLocked = isDeliveredTerminal(job.status) && !isAdmin;
-  const canAdminEditAmount = isAdmin && job.readyAt != null && !isLocked;
+  const canAdminEditAmount =
+    isAdmin && (job.readyAt != null || job.completedAt != null) && !isLocked;
   const canEditAssignee =
     isStaff && !isLocked && !job.isWarranty && job.status !== "Outsourced";
 
@@ -662,6 +806,9 @@ export default function JobDetailPage() {
     job.completedByOutsource?.name ??
     job.completedByTechnician?.name ??
     "—";
+  const returnNoteDisplay =
+    job.statusHistory.find((e) => e.status === "Return" && e.note?.trim())
+      ?.note ?? null;
 
   return (
     <AppShell>
@@ -683,8 +830,16 @@ export default function JobDetailPage() {
               />
             )}
             {showFinancials && job.serviceAmount != null && (
-              <span className="ml-auto text-sm font-semibold text-emerald-700">
+              <span className="ml-auto text-right text-sm font-semibold text-emerald-700">
                 {formatCurrency(job.serviceAmount)}
+                {isAdmin && (
+                  <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
+                    {formatBillSplitLine(job)}
+                    {serviceKindLabel(job.serviceKind)
+                      ? ` · ${serviceKindLabel(job.serviceKind)}`
+                      : ""}
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -698,20 +853,118 @@ export default function JobDetailPage() {
 
         {showReadyForm && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 shadow-sm space-y-2">
-            <h3 className="text-sm font-semibold text-emerald-900">Mark as Ready</h3>
-            <p className="text-sm text-emerald-800">Service amount is required.</p>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={readyAmount}
-              onChange={(e) => setReadyAmount(e.target.value)}
-              placeholder="Amount in Rs."
-              className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-              autoFocus
-            />
-            {isStaff &&
-              !job.completedByTechnician &&
+            <h3 className="text-sm font-semibold text-emerald-900">Mark as Job Completed</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label
+                  className={`mb-1 block text-xs font-medium ${
+                    readyShowErrors && readyServiceCharge.trim() === ""
+                      ? "text-red-700"
+                      : "text-emerald-900"
+                  }`}
+                >
+                  Service charge *
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  required
+                  value={readyServiceCharge}
+                  onChange={(e) => setReadyServiceCharge(e.target.value)}
+                  onFocus={(e) => {
+                    if (e.target.value === "0") setReadyServiceCharge("");
+                    else e.target.select();
+                  }}
+                  placeholder="Required"
+                  className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 ${
+                    readyShowErrors && readyServiceCharge.trim() === ""
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : "border-slate-300 focus-visible:ring-emerald-500"
+                  }`}
+                  autoFocus
+                />
+                {readyShowErrors && readyServiceCharge.trim() === "" && (
+                  <p className="mt-0.5 text-xs text-red-600">Enter value</p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-emerald-900">
+                  Spares amount
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={readySparesAmount}
+                  onChange={(e) => setReadySparesAmount(e.target.value)}
+                  onFocus={(e) => {
+                    if (e.target.value === "0") setReadySparesAmount("");
+                    else e.target.select();
+                  }}
+                  placeholder="0"
+                  className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                />
+              </div>
+            </div>
+            <p
+              className={`text-xs font-medium ${
+                readyShowErrors && !isServiceKind(readyServiceKind)
+                  ? "text-red-700"
+                  : "text-emerald-900"
+              }`}
+            >
+              Service type *
+            </p>
+            <div
+              className={`flex gap-4 text-sm ${
+                readyShowErrors && !isServiceKind(readyServiceKind)
+                  ? "text-red-700"
+                  : "text-emerald-900"
+              }`}
+            >
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={readyServiceKind === "minor"}
+                  onChange={() =>
+                    setReadyServiceKind((prev) =>
+                      prev === "minor" ? "" : "minor"
+                    )
+                  }
+                />
+                Minor service
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={readyServiceKind === "major"}
+                  onChange={() =>
+                    setReadyServiceKind((prev) =>
+                      prev === "major" ? "" : "major"
+                    )
+                  }
+                />
+                Major service
+              </label>
+            </div>
+            {readyShowErrors && !isServiceKind(readyServiceKind) && (
+              <p className="-mt-1 text-xs text-red-600">Enter value</p>
+            )}
+            <p className="text-sm font-semibold text-emerald-900">
+              Total{" "}
+              {formatCurrency(
+                (readyServiceCharge.trim() === ""
+                  ? 0
+                  : Number(readyServiceCharge) || 0) +
+                  (readySparesAmount.trim() === ""
+                    ? 0
+                    : Number(readySparesAmount) || 0)
+              )}
+            </p>
+            {(role === "reception" ||
+              role === "admin" ||
+              role === "technician") &&
               job.status !== "Outsourced" &&
               !job.isWarranty &&
               job.status !== "WarrantyPending" &&
@@ -740,10 +993,85 @@ export default function JobDetailPage() {
                 disabled={saving}
                 className="flex-1 rounded-md bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
               >
+                Confirm Completed
+              </button>
+              <button
+                onClick={() => {
+                  setReadyShowErrors(false);
+                  setShowReadyForm(false);
+                }}
+                className="flex-1 rounded-md border border-slate-300 bg-white py-2.5 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showVerifyReadyForm && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 shadow-sm space-y-2">
+            <h3 className="text-sm font-semibold text-emerald-900">Mark Ready</h3>
+            <p className="text-xs text-emerald-800">
+              Confirm the job and enter the rack. This sends the WhatsApp ready message.
+            </p>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-emerald-900">
+                Rack
+              </label>
+              <input
+                type="text"
+                value={rackDetail}
+                onChange={(e) => setRackDetail(e.target.value)}
+                placeholder="e.g. A-12"
+                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={confirmVerifierReady}
+                disabled={saving}
+                className="flex-1 rounded-md bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
                 Confirm Ready
               </button>
               <button
-                onClick={() => setShowReadyForm(false)}
+                onClick={() => setShowVerifyReadyForm(false)}
+                className="flex-1 rounded-md border border-slate-300 bg-white py-2.5 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showReturnForm && (
+          <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 shadow-sm space-y-2">
+            <h3 className="text-sm font-semibold text-orange-900">Mark as Return</h3>
+            <p className="text-xs text-orange-800">
+              A note is required (reason for return).
+            </p>
+            <textarea
+              value={returnNote}
+              onChange={(e) => setReturnNote(e.target.value)}
+              rows={3}
+              placeholder="Why is this job being returned?"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={confirmReturn}
+                disabled={saving}
+                className="flex-1 rounded-md bg-orange-600 py-2.5 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+              >
+                Confirm Return
+              </button>
+              <button
+                onClick={() => {
+                  setShowReturnForm(false);
+                  setReturnNote("");
+                }}
                 className="flex-1 rounded-md border border-slate-300 bg-white py-2.5 text-sm"
               >
                 Cancel
@@ -1076,6 +1404,38 @@ export default function JobDetailPage() {
             )}
           </CompactRow>
           <CompactRow label="Completed">{completedByLabel}</CompactRow>
+          {(role === "verifier" || role === "admin" || role === "reception") && (
+            <CompactRow label="Rack" wrap>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={rackDetail}
+                  onChange={(e) => setRackDetail(e.target.value)}
+                  placeholder="Rack location"
+                  className="h-8 min-w-0 flex-1 rounded-md border border-slate-300 px-2 text-xs"
+                />
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => updateJob({ rackDetail })}
+                  className="shrink-0 rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            </CompactRow>
+          )}
+          {role === "technician" && job.rackDetail ? (
+            <CompactRow label="Rack">{job.rackDetail}</CompactRow>
+          ) : null}
+
+          {returnNoteDisplay && (
+            <CompactRow label="Return note" title={returnNoteDisplay} wrap>
+              <span className="whitespace-pre-wrap text-orange-900">
+                {returnNoteDisplay}
+              </span>
+            </CompactRow>
+          )}
 
           {job.isWarranty && (
             <div className="flex items-center gap-2 text-sm leading-snug">
@@ -1281,7 +1641,23 @@ export default function JobDetailPage() {
             {canAdminEditAmount && !showAmountEdit && (
               <button
                 type="button"
-                onClick={() => setShowAmountEdit(true)}
+                onClick={() => {
+                  setEditServiceCharge(
+                    amountInputValue(
+                      job.serviceCharge != null
+                        ? job.serviceCharge
+                        : job.sparesAmount == null
+                          ? job.serviceAmount
+                          : null
+                    )
+                  );
+                  setEditSparesAmount(amountInputValue(job.sparesAmount));
+                  setEditServiceKind(
+                    isServiceKind(job.serviceKind) ? job.serviceKind : ""
+                  );
+                  setEditShowErrors(false);
+                  setShowAmountEdit(true);
+                }}
                 className="flex-1 rounded-md border border-slate-300 bg-white py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 Edit Amount
@@ -1334,15 +1710,114 @@ export default function JobDetailPage() {
 
         {showAmountEdit && isAdmin && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
-            <h3 className="text-sm font-semibold text-amber-900">Edit Service Amount</h3>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={editAmount}
-              onChange={(e) => setEditAmount(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-            />
+            <h3 className="text-sm font-semibold text-amber-900">Edit bill amounts</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label
+                  className={`mb-1 block text-xs font-medium ${
+                    editShowErrors && editServiceCharge.trim() === ""
+                      ? "text-red-700"
+                      : "text-amber-900"
+                  }`}
+                >
+                  Service charge *
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editServiceCharge}
+                  onChange={(e) => setEditServiceCharge(e.target.value)}
+                  onFocus={(e) => {
+                    if (e.target.value === "0") setEditServiceCharge("");
+                    else e.target.select();
+                  }}
+                  placeholder="Required"
+                  required
+                  className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 ${
+                    editShowErrors && editServiceCharge.trim() === ""
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : "border-slate-300 focus-visible:ring-emerald-500"
+                  }`}
+                />
+                {editShowErrors && editServiceCharge.trim() === "" && (
+                  <p className="mt-0.5 text-xs text-red-600">Enter value</p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-amber-900">
+                  Spares amount
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editSparesAmount}
+                  onChange={(e) => setEditSparesAmount(e.target.value)}
+                  onFocus={(e) => {
+                    if (e.target.value === "0") setEditSparesAmount("");
+                    else e.target.select();
+                  }}
+                  placeholder="0"
+                  className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                />
+              </div>
+            </div>
+            <p
+              className={`text-xs font-medium ${
+                editShowErrors && !isServiceKind(editServiceKind)
+                  ? "text-red-700"
+                  : "text-amber-900"
+              }`}
+            >
+              Service type *
+            </p>
+            <div
+              className={`flex gap-4 text-sm ${
+                editShowErrors && !isServiceKind(editServiceKind)
+                  ? "text-red-700"
+                  : "text-amber-900"
+              }`}
+            >
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={editServiceKind === "minor"}
+                  onChange={() =>
+                    setEditServiceKind((prev) =>
+                      prev === "minor" ? "" : "minor"
+                    )
+                  }
+                />
+                Minor service
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={editServiceKind === "major"}
+                  onChange={() =>
+                    setEditServiceKind((prev) =>
+                      prev === "major" ? "" : "major"
+                    )
+                  }
+                />
+                Major service
+              </label>
+            </div>
+            {editShowErrors && !isServiceKind(editServiceKind) && (
+              <p className="-mt-1 text-xs text-red-600">Enter value</p>
+            )}
+            <p className="text-sm font-semibold text-amber-900">
+              Total{" "}
+              {formatCurrency(
+                (editServiceCharge.trim() === ""
+                  ? 0
+                  : Number(editServiceCharge) || 0) +
+                  (editSparesAmount.trim() === ""
+                    ? 0
+                    : Number(editSparesAmount) || 0)
+              )}
+            </p>
             <div className="flex gap-2">
               <button
                 onClick={handleSaveAmount}
@@ -1352,7 +1827,10 @@ export default function JobDetailPage() {
                 Save Amount
               </button>
               <button
-                onClick={() => setShowAmountEdit(false)}
+                onClick={() => {
+                  setEditShowErrors(false);
+                  setShowAmountEdit(false);
+                }}
                 className="flex-1 rounded-md border border-slate-300 bg-white py-2.5 text-sm"
               >
                 Cancel

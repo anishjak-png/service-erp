@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   const data: {
     name?: string;
-    role?: "reception" | "technician" | "admin";
+    role?: "reception" | "technician" | "admin" | "verifier";
     active?: boolean;
     passwordHash?: string;
     mobile?: string;
@@ -58,7 +58,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   if (body.role !== undefined) {
-    if (!["reception", "technician", "admin"].includes(body.role)) {
+    if (!["reception", "technician", "admin", "verifier"].includes(body.role)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
     data.role = body.role;

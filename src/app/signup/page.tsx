@@ -22,45 +22,48 @@ function suggestSlug(name: string): string {
 export default function SignupPage() {
   const router = useRouter();
   const [shopName, setShopName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [adminName, setAdminName] = useState("");
   const [adminMobile, setAdminMobile] = useState("");
   const [adminPin, setAdminPin] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const effectiveSlug = useMemo(
-    () => (slugTouched ? slug : suggestSlug(shopName)),
-    [slug, slugTouched, shopName]
-  );
+  const effectiveSlug = useMemo(() => suggestSlug(shopName), [shopName]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const res = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        shopName,
-        slug: effectiveSlug,
-        adminName,
-        adminMobile,
-        adminPin,
-      }),
-    });
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shopName,
+          slug: effectiveSlug,
+          adminName,
+          adminMobile,
+          adminPin,
+          inviteCode,
+        }),
+      });
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error ?? "Signup failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Signup failed");
+        return;
+      }
+
+      router.push(
+        `/?tenant=${encodeURIComponent(data.tenant?.slug ?? effectiveSlug)}`
+      );
+    } catch {
+      setError("Could not reach the server. Try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setLoading(false);
-    router.push(`/?tenant=${encodeURIComponent(data.tenant?.slug ?? effectiveSlug)}`);
   }
 
   return (
@@ -70,10 +73,31 @@ export default function SignupPage() {
           <CardTitle className="text-2xl text-emerald-800">
             Create your shop
           </CardTitle>
-          <p className="text-sm text-slate-500">Service ERP — new tenant</p>
+          <p className="text-sm text-slate-500">
+            Invite code required — shops cannot be created without it
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="inviteCode"
+                className="text-sm font-medium text-slate-700"
+              >
+                Invite code
+              </label>
+              <input
+                id="inviteCode"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="Provided by Service ERP"
+                className="flex h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                autoComplete="off"
+                autoFocus
+                required
+              />
+            </div>
+
             <div className="space-y-2">
               <label
                 htmlFor="shopName"
@@ -85,39 +109,10 @@ export default function SignupPage() {
                 id="shopName"
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
-                placeholder="e.g. Acme Appliance Service"
-                className="flex h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                autoFocus
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label
-                htmlFor="slug"
-                className="text-sm font-medium text-slate-700"
-              >
-                Shop URL slug
-              </label>
-              <input
-                id="slug"
-                value={effectiveSlug}
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  setSlug(
-                    e.target.value
-                      .toLowerCase()
-                      .replace(/[^a-z0-9-]/g, "")
-                  );
-                }}
-                placeholder="your-shop"
+                placeholder="e.g. UMA TRADERS"
                 className="flex h-12 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                 required
               />
-              <p className="text-xs text-slate-400">
-                Login with ?tenant={effectiveSlug || "slug"} or{" "}
-                {effectiveSlug || "slug"}.localhost
-              </p>
             </div>
 
             <div className="space-y-2">

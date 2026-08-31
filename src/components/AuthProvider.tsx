@@ -9,17 +9,19 @@ import {
   type ReactNode,
 } from "react";
 
-export type StaffRole = "reception" | "technician" | "admin";
+export type StaffRole = "reception" | "technician" | "admin" | "verifier";
 
 type AuthState = {
   isLoggedIn: boolean;
   role: StaffRole | null;
   staffName: string | null;
+  tenantName: string | null;
   technicianId: string | null;
   technicianName: string | null;
   deviceStatus: "pending" | "approved" | "revoked" | null;
   deviceApproved: boolean;
   pendingDeviceCount: number;
+  unreadAlertCount: number;
   loaded: boolean;
 };
 
@@ -31,11 +33,13 @@ const AuthContext = createContext<AuthContextValue>({
   isLoggedIn: false,
   role: null,
   staffName: null,
+  tenantName: null,
   technicianId: null,
   technicianName: null,
   deviceStatus: null,
   deviceApproved: false,
   pendingDeviceCount: 0,
+  unreadAlertCount: 0,
   loaded: false,
   refreshAuth: async () => {},
 });
@@ -45,11 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoggedIn: false,
     role: null,
     staffName: null,
+    tenantName: null,
     technicianId: null,
     technicianName: null,
     deviceStatus: null,
     deviceApproved: false,
     pendingDeviceCount: 0,
+    unreadAlertCount: 0,
     loaded: false,
   });
 
@@ -61,11 +67,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoggedIn: Boolean(data.isLoggedIn),
         role: data.role ?? null,
         staffName: data.staffName ?? null,
+        tenantName: data.tenantName ?? null,
         technicianId: data.technicianId ?? null,
         technicianName: data.technicianName ?? null,
         deviceStatus: data.deviceStatus ?? null,
         deviceApproved: Boolean(data.deviceApproved),
         pendingDeviceCount: data.pendingDeviceCount ?? 0,
+        unreadAlertCount: data.unreadAlertCount ?? 0,
         loaded: true,
       });
     } catch {

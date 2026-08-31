@@ -1,5 +1,9 @@
 import { getSession, isDeviceApproved } from "./session";
 import type { StaffRole } from "./session";
+import {
+  canCreateJob as canCreateJobRole,
+  canDeliverJob as canDeliverJobRole,
+} from "./roles";
 
 export async function requireAdmin() {
   const session = await getSession();
@@ -34,11 +38,11 @@ export async function requireApprovedDevice() {
 }
 
 export function canCreateJob(role: StaffRole) {
-  return role === "reception" || role === "admin" || role === "technician";
+  return canCreateJobRole(role);
 }
 
 export function canDeliverJob(role: StaffRole) {
-  return role === "reception" || role === "admin" || role === "technician";
+  return canDeliverJobRole(role);
 }
 
 export function canEditDeliveredJob(role: StaffRole) {
@@ -74,7 +78,10 @@ export async function requireWhatsAppInboxAccess() {
   return session;
 }
 
-/** Amount is locked once the job has been marked Ready at least once. */
-export function isServiceAmountLocked(job: { readyAt: Date | null }) {
-  return job.readyAt != null;
+/** Amount is locked once the technician has completed the job. */
+export function isServiceAmountLocked(job: {
+  readyAt: Date | null;
+  completedAt?: Date | null;
+}) {
+  return job.readyAt != null || job.completedAt != null;
 }

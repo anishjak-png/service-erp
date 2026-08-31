@@ -183,86 +183,57 @@ type Db = PrismaClient;
 
 /** Seeds generic appliances / brands / complaints / accessories for a tenant. */
 export async function seedGenericAppliances(db: Db, tenantId: string) {
-  for (const value of GENERIC_APPLIANCES) {
-    await db.lookupOption.upsert({
-      where: {
-        tenantId_category_value: { tenantId, category: "appliance", value },
-      },
-      update: {},
-      create: { tenantId, category: "appliance", value },
-    });
-  }
-
-  for (const value of GENERIC_BRANDS) {
-    await db.lookupOption.upsert({
-      where: {
-        tenantId_category_value: { tenantId, category: "brand", value },
-      },
-      update: {},
-      create: { tenantId, category: "brand", value },
-    });
-  }
-
-  for (const value of GENERIC_COMPLAINTS) {
-    await db.lookupOption.upsert({
-      where: {
-        tenantId_category_value: { tenantId, category: "complaint", value },
-      },
-      update: {},
-      create: { tenantId, category: "complaint", value },
-    });
-  }
-
   const allowed = new Set<string>(GENERIC_APPLIANCES);
 
-  for (const [applianceType, brands] of Object.entries(APPLIANCE_BRANDS)) {
-    if (!allowed.has(applianceType)) continue;
-    for (const brand of brands) {
-      await db.applianceBrand.upsert({
-        where: {
-          tenantId_applianceType_brand: { tenantId, applianceType, brand },
-        },
-        update: {},
-        create: { tenantId, applianceType, brand },
-      });
-    }
-  }
+  const lookups = [
+    ...GENERIC_APPLIANCES.map((value) => ({
+      tenantId,
+      category: "appliance",
+      value,
+    })),
+    ...GENERIC_BRANDS.map((value) => ({
+      tenantId,
+      category: "brand",
+      value,
+    })),
+    ...GENERIC_COMPLAINTS.map((value) => ({
+      tenantId,
+      category: "complaint",
+      value,
+    })),
+  ];
 
-  for (const [applianceType, complaints] of Object.entries(
-    APPLIANCE_COMPLAINTS
-  )) {
-    if (!allowed.has(applianceType)) continue;
-    for (const complaint of complaints) {
-      await db.applianceComplaint.upsert({
-        where: {
-          tenantId_applianceType_complaint: {
-            tenantId,
-            applianceType,
-            complaint,
-          },
-        },
-        update: {},
-        create: { tenantId, applianceType, complaint },
-      });
-    }
-  }
+  const brands = Object.entries(APPLIANCE_BRANDS).flatMap(
+    ([applianceType, list]) =>
+      allowed.has(applianceType)
+        ? list.map((brand) => ({ tenantId, applianceType, brand }))
+        : []
+  );
 
-  for (const [applianceType, accessories] of Object.entries(
-    APPLIANCE_ACCESSORIES
-  )) {
-    if (!allowed.has(applianceType)) continue;
-    for (const accessory of accessories) {
-      await db.applianceAccessory.upsert({
-        where: {
-          tenantId_applianceType_accessory: {
-            tenantId,
-            applianceType,
-            accessory,
-          },
-        },
-        update: {},
-        create: { tenantId, applianceType, accessory },
-      });
-    }
-  }
+  const complaints = Object.entries(APPLIANCE_COMPLAINTS).flatMap(
+    ([applianceType, list]) =>
+      allowed.has(applianceType)
+        ? list.map((complaint) => ({ tenantId, applianceType, complaint }))
+        : []
+  );
+
+  const accessories = Object.entries(APPLIANCE_ACCESSORIES).flatMap(
+    ([applianceType, list]) =>
+      allowed.has(applianceType)
+        ? list.map((accessory) => ({ tenantId, applianceType, accessory }))
+        : []
+  );
+
+  await Promise.all([
+    db.lookupOption.createMany({ data: lookups, skipDuplicates: true }),
+    db.applianceBrand.createMany({ data: brands, skipDuplicates: true }),
+    db.applianceComplaint.createMany({
+      data: complaints,
+      skipDuplicates: true,
+    }),
+    db.applianceAccessory.createMany({
+      data: accessories,
+      skipDuplicates: true,
+    }),
+  ]);
 }

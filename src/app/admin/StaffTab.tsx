@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCallback, useEffect, useState } from "react";
 
-type StaffRole = "reception" | "technician" | "admin";
+type StaffRole = "reception" | "technician" | "admin" | "verifier";
 
 type StaffRow = {
   id: string;
@@ -225,7 +225,18 @@ export function StaffTab() {
         </button>
       </div>
 
-      {loadError && <p className="text-sm text-red-600">{loadError}</p>}
+      {loadError && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-red-600">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => load()}
+            className="shrink-0 text-xs font-medium text-emerald-700"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {message && <p className="text-sm text-emerald-700">{message}</p>}
 
       {showForm && (

@@ -9,6 +9,9 @@ const sessionFreePaths = new Set([
   "/api/auth/login",
   "/api/auth/signup",
   "/api/webhooks/whatsapp",
+  "/platform/login",
+  "/api/platform/auth/login",
+  "/shop-login",
 ]);
 
 const sessionFreePrefixes = ["/j/", "/api/track"];
@@ -22,6 +25,9 @@ const publicPaths = new Set([
   "/api/auth/signup",
   "/device-pending",
   "/api/webhooks/whatsapp",
+  "/platform/login",
+  "/api/platform/auth/login",
+  "/shop-login",
 ]);
 const publicPrefixes = ["/j/", "/api/track"];
 
@@ -33,6 +39,10 @@ function isSessionFree(pathname: string): boolean {
 function isPublic(pathname: string): boolean {
   if (publicPaths.has(pathname)) return true;
   return publicPrefixes.some((p) => pathname.startsWith(p));
+}
+
+function isPlatformRoute(pathname: string): boolean {
+  return pathname === "/platform" || pathname.startsWith("/platform/") || pathname.startsWith("/api/platform/");
 }
 
 function withTenantHeaders(request: NextRequest): Headers {
@@ -90,7 +100,31 @@ async function runMiddleware(request: NextRequest) {
 
   const session = await getSession();
 
-  if (pathname === "/" && session.isLoggedIn) {
+  if (isPlatformRoute(pathname) && !isSessionFree(pathname)) {
+    if (!session.isLoggedIn || !session.isPlatformAdmin) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/platform/login", request.url));
+    }
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
+
+  if (pathname === "/" && session.isLoggedIn && session.isPlatformAdmin) {
+    const shopLogin =
+      request.nextUrl.searchParams.get("tenant")?.trim() ||
+      request.nextUrl.searchParams.get("shop")?.trim();
+    if (!shopLogin) {
+      return NextResponse.redirect(new URL("/platform", request.url));
+    }
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
+
+  if (pathname === "/" && session.isLoggedIn && !session.isPlatformAdmin) {
     if (!session.tenantId) {
       return NextResponse.redirect(new URL("/?reauth=1", request.url));
     }
@@ -117,7 +151,7 @@ async function runMiddleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (!session.tenantId) {
+  if (!session.tenantId && pathname !== "/api/auth/me" && pathname !== "/api/auth/logout") {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { error: "Tenant context required — please sign in again" },

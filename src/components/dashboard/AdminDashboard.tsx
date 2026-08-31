@@ -7,14 +7,21 @@ type AdminDashboardProps = {
   data: {
     todayJobs: number;
     pendingJobs: number;
+    pendingTokens: number;
     readyJobs: number;
     deliveredJobs: number;
     waitingApprovalJobs: number;
     outsourcedJobs: number;
     warrantyJobs: number;
     todayCollection: number;
+    todayServiceCharge: number;
+    todaySparesAmount: number;
     monthlyCollection: number;
+    monthlyServiceCharge: number;
+    monthlySparesAmount: number;
     pendingCollection: number;
+    pendingServiceCharge: number;
+    pendingSparesAmount: number;
     readyForPickup: Array<{
       id: string;
       jobNumber: string;
@@ -22,6 +29,8 @@ type AdminDashboardProps = {
       applianceType: string;
       readyAt?: string | Date | null;
       serviceAmount?: number | null;
+      serviceCharge?: number | null;
+      sparesAmount?: number | null;
       deliveryContactStatus: "not_contacted" | "contacted";
       expectedDeliveryAt?: string | Date | null;
       customer: { name?: string | null; mobile: string };
@@ -38,17 +47,19 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
         <StatCard
           label="Today's Collection"
           value={formatCurrency(data.todayCollection)}
+          subtext={`Service ${formatCurrency(data.todayServiceCharge)} · Spares ${formatCurrency(data.todaySparesAmount)}`}
           valueClassName="text-emerald-800"
         />
         <StatCard
           label="Monthly Collection"
           value={formatCurrency(data.monthlyCollection)}
+          subtext={`Service ${formatCurrency(data.monthlyServiceCharge)} · Spares ${formatCurrency(data.monthlySparesAmount)}`}
           valueClassName="text-emerald-800"
         />
         <StatCard
           label="Pending Collection"
           value={formatCurrency(data.pendingCollection)}
-          subtext="Ready, not delivered"
+          subtext={`Service ${formatCurrency(data.pendingServiceCharge)} · Spares ${formatCurrency(data.pendingSparesAmount)} · Ready, not delivered`}
           valueClassName="text-amber-800"
         />
       </div>
@@ -63,6 +74,24 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
             className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             New Job
+          </Link>
+          <Link
+            href="/tokens/new"
+            className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            New Token
+          </Link>
+          <Link
+            href="/tokens?status=Pending"
+            className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Pending Tokens{data.pendingTokens > 0 ? ` (${data.pendingTokens})` : ""}
+          </Link>
+          <Link
+            href="/jobs/ready"
+            className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Ready
           </Link>
           <Link
             href="/jobs/delivery"
@@ -115,7 +144,7 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
         </div>
       </section>
 
-      <ReadyPickupList jobs={data.readyForPickup} />
+      <ReadyPickupList jobs={data.readyForPickup} showBillSplit />
 
       <Link
         href="/admin?tab=whatsapp"

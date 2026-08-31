@@ -18,21 +18,44 @@ export type TenantRecord = {
 
 export { isValidTenantSlug, resolveTenantSlugFromRequest, slugFromHost, slugify };
 
+const tenantSelect = {
+  id: true,
+  slug: true,
+  name: true,
+  phone: true,
+  logoUrl: true,
+  jobPrefix: true,
+  status: true,
+} as const;
+
 export async function getTenantBySlug(slug: string): Promise<TenantRecord | null> {
   const tenant = await prisma.tenant.findUnique({
     where: { slug: slug.toLowerCase() },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      phone: true,
-      logoUrl: true,
-      jobPrefix: true,
-      status: true,
-    },
+    select: tenantSelect,
   });
   if (!tenant) return null;
   return tenant;
+}
+
+/** Resolve a shop by URL slug or display name (login / track). */
+export async function getTenantBySlugOrName(
+  input: string
+): Promise<TenantRecord | null> {
+  const raw = input.trim();
+  if (!raw) return null;
+
+  const asSlug = slugify(raw);
+  if (asSlug) {
+    const bySlug = await getTenantBySlug(asSlug);
+    if (bySlug) return bySlug;
+  }
+
+  const matches = await prisma.tenant.findMany({
+    where: { name: { equals: raw, mode: "insensitive" } },
+    select: tenantSelect,
+    take: 2,
+  });
+  return matches.length === 1 ? matches[0] : null;
 }
 
 export function tenantWhere(session: { tenantId?: string | null }) {

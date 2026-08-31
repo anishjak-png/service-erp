@@ -12,7 +12,7 @@ import {
   upsertStaffDevice,
 } from "@/lib/staff-auth";
 import { getSession } from "@/lib/session";
-import { getTenantBySlug, resolveTenantSlugFromRequest } from "@/lib/tenant";
+import { getTenantBySlugOrName, resolveTenantSlugFromRequest } from "@/lib/tenant";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   let staffUser = null;
 
   if (tenantSlug) {
-    const tenant = await getTenantBySlug(tenantSlug);
+    const tenant = await getTenantBySlugOrName(tenantSlug);
     if (!tenant || tenant.status !== "active") {
       return NextResponse.json(
         { error: "Shop not found or suspended" },
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Multiple shops found for this mobile — open via ?tenant=slug or subdomain",
+            "Multiple shops found for this mobile — enter the shop name",
         },
         { status: 400 }
       );
@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
   session.tenantId = staffUser.tenantId;
   session.tenantSlug = staffUser.tenant.slug;
   session.tenantName = staffUser.tenant.name;
+  session.isPlatformAdmin = false;
 
   if (staffUser.role === "technician" && staffUser.technician) {
     session.technicianId = staffUser.technician.id;

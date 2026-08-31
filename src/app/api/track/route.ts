@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { normalizeMobile } from "@/lib/jobs";
 import { STATUS_LABELS } from "@/lib/constants";
 import {
-  getTenantBySlug,
+  getTenantBySlugOrName,
   resolveTenantSlugFromRequest,
 } from "@/lib/tenant";
 
@@ -22,12 +22,12 @@ export async function GET(request: NextRequest) {
 
   if (!slug) {
     return NextResponse.json(
-      { error: "Tenant required. Pass ?tenant=slug or use a tenant subdomain." },
+      { error: "Shop name required. Enter the shop name or use ?tenant=…" },
       { status: 400 }
     );
   }
 
-  const tenant = await getTenantBySlug(slug);
+  const tenant = await getTenantBySlugOrName(slug);
   if (!tenant || tenant.status !== "active") {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
