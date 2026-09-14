@@ -6,7 +6,6 @@ import {
   verifyPassword,
 } from "@/lib/password";
 import {
-  countApprovedDevices,
   revokeOtherApprovedDevices,
   staffRoleToSessionRole,
   upsertStaffDevice,
@@ -14,6 +13,27 @@ import {
 import { getSession } from "@/lib/session";
 
 export async function POST(request: NextRequest) {
+  try {
+    return await handleLogin(request);
+  } catch (err) {
+    console.error("[POST /api/auth/login]", err);
+    const message = err instanceof Error ? err.message : "Sign-in failed";
+    const dbDown =
+      /can't reach database|P1001|P1017|ENOTFOUND|authentication failed/i.test(
+        message
+      );
+    return NextResponse.json(
+      {
+        error: dbDown
+          ? "Database unavailable. Check Vercel DATABASE_URL."
+          : "Sign-in failed. Please try again.",
+      },
+      { status: 503 }
+    );
+  }
+}
+
+async function handleLogin(request: NextRequest) {
   const body = await request.json();
   const mobileRaw = body.mobile;
   const password = body.password;
@@ -75,8 +95,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const approvedCount = await countApprovedDevices(staffUser.tenantId);
-  const autoApprove = staffUser.role === "admin" && approvedCount === 0;
+  const approvedForThisAdmin = await prisma.staffDevice.count({
+    where: {
+      staffUserId: staffUser.id,
+      status: "approved",
+    },
+  });
+  const autoApprove =
+    staffUser.role === "admin" && approvedForThisAdmin === 0;
 
   const device = await upsertStaffDevice({
     tenantId: staffUser.tenantId,

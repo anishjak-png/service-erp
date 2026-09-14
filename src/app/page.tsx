@@ -37,17 +37,24 @@ export default function LoginPage() {
 
     const identity = await getDeviceIdentity();
 
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mobile,
-        password,
-        deviceId: identity.deviceId,
-        deviceLabel: identity.deviceLabel,
-        platform: identity.platform,
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mobile,
+          password,
+          deviceId: identity.deviceId,
+          deviceLabel: identity.deviceLabel,
+          platform: identity.platform,
+        }),
+      });
+    } catch {
+      setError("Could not reach the server. Try again.");
+      setLoading(false);
+      return;
+    }
 
     const data = await res.json().catch(() => ({}));
 
