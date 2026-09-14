@@ -11,7 +11,6 @@ import {
   isPhotoPickerCancelled,
   pickNativePhoto,
 } from "@/lib/native-photo";
-import { useAuth } from "@/components/AuthProvider";
 import { fastGet, invalidateJobCaches } from "@/lib/fast-fetch";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -35,7 +34,6 @@ type LookupOptions = {
 };
 
 export default function NewJobPage() {
-  const { loaded: authLoaded } = useAuth();
   const [lookupOptions, setLookupOptions] = useState<Record<string, string[]>>({
     appliance: [],
     brand: [],
@@ -459,14 +457,6 @@ export default function NewJobPage() {
     setCreatedJob(data as unknown as CreatedJob);
     invalidateJobCaches();
     setLoading(false);
-  }
-
-  if (!authLoaded) {
-    return (
-      <AppShell>
-        <p className="text-center text-slate-500">Loading...</p>
-      </AppShell>
-    );
   }
 
   if (createdJob) {

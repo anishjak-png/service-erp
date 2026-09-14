@@ -137,7 +137,7 @@ export default function SearchContent() {
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [directory, setDirectory] = useState<DirectoryCustomer[]>([]);
-  const { scope, setScope, ready: scopeReady } = useTechnicianJobScope();
+  const { scope, setScope } = useTechnicianJobScope();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -272,7 +272,7 @@ export default function SearchContent() {
   );
 
   useEffect(() => {
-    if (!roleLoaded) return;
+    if (!role && !roleLoaded) return;
     if (statusFilter !== "Outsourced" && !initialOutsourcedToId) return;
     fetch("/api/outsource-partners")
       .then((r) => r.json())
@@ -283,8 +283,7 @@ export default function SearchContent() {
   }, [roleLoaded, statusFilter, initialOutsourcedToId]);
 
   useEffect(() => {
-    if (!roleLoaded) return;
-    if (role === "technician" && !scopeReady) return;
+    if (!role && !roleLoaded) return;
 
     const nextStatus = normalizeStatusFilter(initialStatus, initialWarrantyOnly);
     setQuery(initialQ);
@@ -326,7 +325,6 @@ export default function SearchContent() {
     role,
     roleLoaded,
     scope,
-    scopeReady,
     search,
   ]);
 

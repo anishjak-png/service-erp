@@ -45,12 +45,23 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   const job = await prisma.jobCard.findFirst({
     where: { ...tenantFilter, OR: [{ id }, { jobNumber: id }] },
     include: {
-      customer: true,
-      assignedTechnician: true,
-      completedByTechnician: true,
-      outsourcedTo: true,
-      completedByOutsource: true,
-      statusHistory: { orderBy: { changedAt: "desc" } },
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          address: true,
+          allowWhatsappNotifications: true,
+        },
+      },
+      assignedTechnician: { select: { id: true, name: true } },
+      completedByTechnician: { select: { id: true, name: true } },
+      outsourcedTo: { select: { id: true, name: true } },
+      completedByOutsource: { select: { id: true, name: true } },
+      statusHistory: {
+        orderBy: { changedAt: "desc" },
+        take: 40,
+      },
     },
   });
 

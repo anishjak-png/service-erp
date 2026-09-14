@@ -40,7 +40,7 @@ import {
   isPhotoPickerCancelled,
   pickNativePhoto,
 } from "@/lib/native-photo";
-import { fastGet, invalidateJobCaches } from "@/lib/fast-fetch";
+import { fastGet, invalidateJobCaches, peekStaleCache } from "@/lib/fast-fetch";
 import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -225,7 +225,7 @@ const STATUS_ACTION_LABELS: Partial<Record<JobStatusValue, string>> = {
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { role, technicianId, loaded: authLoaded } = useAuth();
+  const { role, technicianId } = useAuth();
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -290,8 +290,15 @@ export default function JobDetailPage() {
   }
 
   const fetchJob = useCallback(async () => {
-    const data = await fastGet<JobDetail | { error?: string }>(`/api/jobs/${id}`, {
-      ttlMs: 8_000,
+    const url = `/api/jobs/${id}`;
+    const warm = peekStaleCache<JobDetail>(url);
+    if (warm && "jobNumber" in warm) {
+      setJob(warm);
+      setLoading(false);
+    }
+
+    const data = await fastGet<JobDetail | { error?: string }>(url, {
+      ttlMs: 60_000,
     });
 
     if (!data || "error" in data || !("jobNumber" in data)) {
@@ -753,7 +760,7 @@ export default function JobDetailPage() {
     warrantyPhotoInputRef.current?.click();
   }
 
-  if (loading || !job || !authLoaded) {
+  if (!job) {
     return (
       <AppShell>
         <p className="text-center text-slate-500">Loading…</p>

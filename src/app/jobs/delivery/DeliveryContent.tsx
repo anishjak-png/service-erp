@@ -6,7 +6,7 @@ import { JobListCard } from "@/components/JobListCard";
 import { JobStatusBadge } from "@/components/JobStatusBadge";
 import type { DeliveryContactStatus } from "@prisma/client";
 import { formatDoneDatestamp } from "@/lib/jobs";
-import { fastGet, peekFastCache, invalidateJobCaches } from "@/lib/fast-fetch";
+import { fastGet, peekFastCache, invalidateJobCaches, peekStaleCache } from "@/lib/fast-fetch";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -44,7 +44,9 @@ export default function DeliveryContent() {
     const params = new URLSearchParams({ delivery: "true" });
     if (q.trim()) params.set("q", q.trim());
     const url = `/api/jobs?${params}`;
-    const warm = peekFastCache<DeliveryJob[]>(url, 8_000);
+    const warm =
+      peekFastCache<DeliveryJob[]>(url, 60_000) ??
+      peekStaleCache<DeliveryJob[]>(url);
     if (Array.isArray(warm)) {
       setResults(warm.filter((j) => DELIVERY_STATUSES.has(j.status)));
       setLoading(false);
@@ -53,7 +55,7 @@ export default function DeliveryContent() {
     }
 
     const data = await fastGet<DeliveryJob[] | { error?: string }>(url, {
-      ttlMs: 8_000,
+      ttlMs: 60_000,
     });
     if (!data || !Array.isArray(data)) {
       setResults([]);
@@ -143,7 +145,7 @@ export default function DeliveryContent() {
         </div>
       )}
 
-      {loading ? (
+      {loading && results.length === 0 ? (
         <p className="text-center text-sm text-slate-500">Loading…</p>
       ) : results.length === 0 ? (
         <p className="text-center text-sm text-slate-500">

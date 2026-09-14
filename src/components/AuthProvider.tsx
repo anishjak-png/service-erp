@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { fastGet, prefetchStaffCaches } from "@/lib/fast-fetch";
+import { fastGet, prefetchStaffCaches, invalidateFastCache } from "@/lib/fast-fetch";
 
 export type StaffRole = "reception" | "technician" | "admin" | "verifier";
 
@@ -30,7 +30,9 @@ type AuthContextValue = AuthState & {
   refreshAuth: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextValue>({
+const AUTH_STORAGE_KEY = "erp-auth-v1";
+
+const emptyAuth: AuthState = {
   isLoggedIn: false,
   role: null,
   staffName: null,
@@ -42,23 +44,41 @@ const AuthContext = createContext<AuthContextValue>({
   pendingDeviceCount: 0,
   unreadAlertCount: 0,
   loaded: false,
+};
+
+function readAuthCache(): AuthState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AuthState;
+    if (!parsed.isLoggedIn || !parsed.role) return null;
+    return { ...parsed, loaded: true };
+  } catch {
+    return null;
+  }
+}
+
+function writeAuthCache(state: AuthState) {
+  if (typeof window === "undefined") return;
+  try {
+    if (state.isLoggedIn && state.role) {
+      sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state));
+    } else {
+      sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+const AuthContext = createContext<AuthContextValue>({
+  ...emptyAuth,
   refreshAuth: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [auth, setAuth] = useState<AuthState>({
-    isLoggedIn: false,
-    role: null,
-    staffName: null,
-    tenantName: null,
-    technicianId: null,
-    technicianName: null,
-    deviceStatus: null,
-    deviceApproved: false,
-    pendingDeviceCount: 0,
-    unreadAlertCount: 0,
-    loaded: false,
-  });
+  const [auth, setAuth] = useState<AuthState>(() => readAuthCache() ?? emptyAuth);
 
   const refreshAuth = useCallback(async () => {
     try {
@@ -80,8 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loaded: true,
       };
       setAuth(next);
+      writeAuthCache(next);
       if (next.isLoggedIn && next.deviceApproved) {
         prefetchStaffCaches();
+      } else {
+        invalidateFastCache();
       }
     } catch {
       setAuth((prev) => ({ ...prev, loaded: true }));
@@ -89,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refreshAuth();
+    void refreshAuth();
   }, [refreshAuth]);
 
   return (

@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { APP_NAME } from "@/lib/constants";
 import { useAuth } from "./AuthProvider";
-import { invalidateFastCache, fastGet } from "@/lib/fast-fetch";
+import { invalidateFastCache, fastGet, prefetchNavHref } from "@/lib/fast-fetch";
 
 type NavLink = { href: string; label: string };
 
@@ -189,6 +189,8 @@ export function AppNav() {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch
+                onPointerDown={() => prefetchNavHref(link.href)}
                 className={`rounded-md px-1 py-2 text-center text-xs font-medium transition-colors ${
                   active
                     ? "bg-white text-emerald-800"

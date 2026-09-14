@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { countPendingDevices } from "@/lib/staff-auth";
 import { countUnreadAlerts } from "@/lib/staff-alerts";
@@ -9,6 +9,54 @@ export async function GET() {
 
   if (!session.isLoggedIn || !session.staffUserId) {
     return NextResponse.json({ isLoggedIn: false });
+  }
+
+  const payload: Record<string, unknown> = {
+    isLoggedIn: true,
+    role: session.role,
+    staffName: session.staffName ?? null,
+    staffUserId: session.staffUserId,
+    tenantId: session.tenantId ?? null,
+    tenantName: session.tenantName ?? null,
+    deviceStatus: session.deviceStatus ?? "pending",
+    deviceApproved: isDeviceApproved(session),
+    technicianId: session.technicianId ?? null,
+    technicianName: session.technicianName ?? null,
+    pendingDeviceCount: 0,
+    unreadAlertCount: 0,
+  };
+
+  const sessionComplete = Boolean(
+    session.tenantId && session.staffName && session.deviceStatus
+  );
+
+  if (sessionComplete && isDeviceApproved(session)) {
+    const staffUserId = session.staffUserId;
+    const tenantId = session.tenantId;
+    const deviceId = session.deviceId;
+    const role = session.role;
+
+    after(async () => {
+      try {
+        if (deviceId && tenantId) {
+          await prisma.staffDevice.updateMany({
+            where: { tenantId, staffUserId, deviceId, status: "approved" },
+            data: { lastSeenAt: new Date() },
+          });
+        }
+      } catch {
+        /* non-blocking */
+      }
+    });
+
+    if (role === "admin" && tenantId) {
+      payload.pendingDeviceCount = await countPendingDevices(tenantId);
+    }
+    if ((role === "verifier" || role === "admin") && tenantId) {
+      payload.unreadAlertCount = await countUnreadAlerts(tenantId, role);
+    }
+
+    return NextResponse.json(payload);
   }
 
   const staffUser = await prisma.staffUser.findUnique({
@@ -38,6 +86,7 @@ export async function GET() {
         staffUserId: session.staffUserId,
         deviceId: session.deviceId,
       },
+      select: { id: true, status: true },
     });
 
     if (!device || device.status === "revoked") {
@@ -49,28 +98,17 @@ export async function GET() {
     }
 
     session.deviceStatus = device.status;
-    if (device.status === "approved") {
-      await prisma.staffDevice.update({
-        where: { id: device.id },
-        data: { lastSeenAt: new Date() },
-      });
-    }
     await session.save();
   }
 
-  const payload: Record<string, unknown> = {
-    isLoggedIn: true,
-    role: session.role,
-    staffName: staffUser.name,
-    staffUserId: staffUser.id,
-    tenantId: staffUser.tenantId,
-    tenantName: staffUser.tenant?.name ?? session.tenantName ?? null,
-    deviceStatus: session.deviceStatus ?? "pending",
-    deviceApproved: isDeviceApproved(session),
-    technicianId: session.technicianId ?? staffUser.technicianId,
-    technicianName:
-      session.technicianName ?? staffUser.technician?.name ?? null,
-  };
+  payload.staffName = staffUser.name;
+  payload.tenantId = staffUser.tenantId;
+  payload.tenantName = staffUser.tenant?.name ?? session.tenantName ?? null;
+  payload.deviceStatus = session.deviceStatus ?? "pending";
+  payload.deviceApproved = isDeviceApproved(session);
+  payload.technicianId = session.technicianId ?? staffUser.technicianId;
+  payload.technicianName =
+    session.technicianName ?? staffUser.technician?.name ?? null;
 
   if (session.role === "admin" && isDeviceApproved(session)) {
     payload.pendingDeviceCount = await countPendingDevices(staffUser.tenantId);

@@ -3,7 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { JobListCard } from "@/components/JobListCard";
 import { useAuth } from "@/components/AuthProvider";
-import { fastGet } from "@/lib/fast-fetch";
+import { fastGet, peekStaleCache } from "@/lib/fast-fetch";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -31,16 +31,21 @@ export default function ReadyVerificationPage() {
   const allowed = role === "verifier" || role === "admin";
 
   const load = useCallback(async () => {
-    const data = await fastGet<ReadyJob[] | { error?: string }>(
-      "/api/jobs?status=JobCompleted",
-      { ttlMs: 8_000 }
-    );
+    const url = "/api/jobs?status=JobCompleted";
+    const warm = peekStaleCache<ReadyJob[]>(url);
+    if (Array.isArray(warm)) {
+      setJobs(warm);
+      setLoading(false);
+    }
+    const data = await fastGet<ReadyJob[] | { error?: string }>(url, {
+      ttlMs: 60_000,
+    });
     setJobs(Array.isArray(data) ? data : []);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (!loaded || !allowed) return;
+    if (!allowed) return;
     load();
     fetch("/api/staff-alerts", { method: "POST" })
       .then(() => refreshAuth())

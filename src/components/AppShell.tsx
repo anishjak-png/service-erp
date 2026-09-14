@@ -1,5 +1,9 @@
-import { ReactNode, Suspense } from "react";
+"use client";
+
+import { createContext, useContext, type ReactNode, Suspense } from "react";
 import { AppNav } from "./AppNav";
+
+const ShellContext = createContext(false);
 
 function NavFallback() {
   return (
@@ -15,14 +19,21 @@ function NavFallback() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const nested = useContext(ShellContext);
+  if (nested) {
+    return <>{children}</>;
+  }
+
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <div className="flex flex-1 flex-col">
-        <Suspense fallback={<NavFallback />}>
-          <AppNav />
-        </Suspense>
-        <main className="mx-auto w-full max-w-lg flex-1 p-3">{children}</main>
+    <ShellContext.Provider value={true}>
+      <div className="flex min-h-screen bg-slate-50">
+        <div className="flex flex-1 flex-col">
+          <Suspense fallback={<NavFallback />}>
+            <AppNav />
+          </Suspense>
+          <main className="mx-auto w-full max-w-lg flex-1 p-3">{children}</main>
+        </div>
       </div>
-    </div>
+    </ShellContext.Provider>
   );
 }

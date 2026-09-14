@@ -58,6 +58,46 @@ function sortReadyForPickup<T extends { jobNumber: string }>(jobs: T[]): T[] {
   );
 }
 
+async function sumDeliveredSplits(
+  tenantId: string,
+  start: Date,
+  end: Date
+): Promise<{
+  totalCollection: number;
+  serviceChargeTotal: number;
+  sparesAmountTotal: number;
+}> {
+  const rows = await prisma.$queryRaw<
+    Array<{ total: number; service: number; spares: number }>
+  >`
+    SELECT
+      COALESCE(SUM("serviceAmount"), 0)::float AS total,
+      COALESCE(SUM(
+        CASE WHEN "serviceCharge" IS NOT NULL OR "sparesAmount" IS NOT NULL
+          THEN COALESCE("serviceCharge", 0)
+          ELSE COALESCE("serviceAmount", 0)
+        END
+      ), 0)::float AS service,
+      COALESCE(SUM(
+        CASE WHEN "serviceCharge" IS NOT NULL OR "sparesAmount" IS NOT NULL
+          THEN COALESCE("sparesAmount", 0)
+          ELSE 0
+        END
+      ), 0)::float AS spares
+    FROM "JobCard"
+    WHERE "tenantId" = ${tenantId}
+      AND status = 'Delivered'
+      AND "deliveredAt" >= ${start}
+      AND "deliveredAt" < ${end}
+  `;
+  const row = rows[0];
+  return {
+    totalCollection: Number(row?.total ?? 0),
+    serviceChargeTotal: Number(row?.service ?? 0),
+    sparesAmountTotal: Number(row?.spares ?? 0),
+  };
+}
+
 export async function getReceptionDashboardData(tenantId: string) {
   const { today, tomorrow } = todayRange();
   const tenantFilter = { tenantId };
@@ -99,7 +139,7 @@ export async function getAdminDashboardData(tenantId: string) {
   const { monthStart, nextMonth } = monthRange();
   const tenantFilter = { tenantId };
 
-  const [todayJobs, statusGroups, todayDelivered, monthlyDelivered, readyRows, pendingTokens] =
+  const [todayJobs, statusGroups, todaySplit, monthlySplit, readyRows, pendingTokens] =
     await Promise.all([
       prisma.jobCard.count({
         where: { ...tenantFilter, receivedAt: { gte: today, lt: tomorrow } },
@@ -109,30 +149,8 @@ export async function getAdminDashboardData(tenantId: string) {
         _count: { id: true },
         where: tenantFilter,
       }),
-      prisma.jobCard.findMany({
-        where: {
-          ...tenantFilter,
-          status: "Delivered",
-          deliveredAt: { gte: today, lt: tomorrow },
-        },
-        select: {
-          serviceAmount: true,
-          serviceCharge: true,
-          sparesAmount: true,
-        },
-      }),
-      prisma.jobCard.findMany({
-        where: {
-          ...tenantFilter,
-          status: "Delivered",
-          deliveredAt: { gte: monthStart, lt: nextMonth },
-        },
-        select: {
-          serviceAmount: true,
-          serviceCharge: true,
-          sparesAmount: true,
-        },
-      }),
+      sumDeliveredSplits(tenantId, today, tomorrow),
+      sumDeliveredSplits(tenantId, monthStart, nextMonth),
       prisma.jobCard.findMany({
         where: { ...tenantFilter, status: "Ready" },
         select: readyPickupSelect,
@@ -143,8 +161,6 @@ export async function getAdminDashboardData(tenantId: string) {
     ]);
 
   const counts = countsFromGroups(statusGroups);
-  const todaySplit = sumBillSplits(todayDelivered);
-  const monthlySplit = sumBillSplits(monthlyDelivered);
   const readySplit = sumBillSplits(readyRows);
 
   return {
@@ -168,7 +184,7 @@ export async function getAdminDashboardData(tenantId: string) {
   };
 }
 
-const DASH_TTL_MS = 12_000;
+const DASH_TTL_MS = 30_000;
 const dashMemory = new Map<string, { at: number; data: unknown }>();
 
 export async function getReceptionDashboardDataCached(tenantId: string) {

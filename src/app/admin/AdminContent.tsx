@@ -124,7 +124,7 @@ export default function AdminContent() {
     }
   }, [authLoaded, isLoggedIn, role, router]);
 
-  if (!authLoaded) {
+  if (!authLoaded && role !== "admin") {
     return (
       <AppShell>
         <p className="text-center text-slate-500">Loading…</p>

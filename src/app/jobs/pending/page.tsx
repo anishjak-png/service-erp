@@ -22,7 +22,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, Suspense } from "react";
-import { fastGet, peekFastCache } from "@/lib/fast-fetch";
+import { fastGet, peekFastCache, peekStaleCache } from "@/lib/fast-fetch";
 
 type PendingJob = {
   id: string;
@@ -123,7 +123,7 @@ function PendingJobsContent() {
   const [outsourcedTotal, setOutsourcedTotal] = useState(0);
   const [warrantyTotal, setWarrantyTotal] = useState(0);
   const [activeTotal, setActiveTotal] = useState(0);
-  const { scope, setScope, ready: scopeReady } = useTechnicianJobScope();
+  const { scope, setScope } = useTechnicianJobScope();
 
   useEffect(() => {
     const urlScope = searchParams.get("scope");
@@ -162,7 +162,9 @@ function PendingJobsContent() {
       }
 
       const url = `/api/jobs?${params}`;
-      const warm = peekFastCache<PaginatedJobsResponse>(url, 8_000);
+      const warm =
+        peekFastCache<PaginatedJobsResponse>(url, 60_000) ??
+        peekStaleCache<PaginatedJobsResponse>(url);
       if (warm && "items" in warm) {
         setJobs(sortBoardJobs(parseActiveJobs(warm.items)));
         setTotal(warm.total);
@@ -176,7 +178,7 @@ function PendingJobsContent() {
       try {
         const data = (await fastGet<
           PaginatedJobsResponse | { error?: string } | null
-        >(url, { ttlMs: 8_000 })) as
+        >(url, { ttlMs: 60_000 })) as
           | PaginatedJobsResponse
           | { error?: string }
           | null;
@@ -204,7 +206,8 @@ function PendingJobsContent() {
   );
 
   useEffect(() => {
-    if (!roleLoaded || role !== "technician") return;
+    if (!role && !roleLoaded) return;
+    if (role !== "technician") return;
     void fastGet<TechnicianStats>("/api/technician/stats", { ttlMs: 8_000 }).then(
       (data) => {
         if (data && "pending" in data) setStats(data);
@@ -213,21 +216,22 @@ function PendingJobsContent() {
   }, [role, roleLoaded]);
 
   useEffect(() => {
-    if (!roleLoaded) return;
+    if (!role && !roleLoaded) return;
     void fastGet<unknown>("/api/outsource-partners", { ttlMs: 120_000 }).then(
       (data) => {
         if (Array.isArray(data)) setPartners(data);
       }
     );
-  }, [roleLoaded]);
+  }, [role, roleLoaded]);
 
   useEffect(() => {
-    if (!roleLoaded) return;
-    if (role === "technician" && !scopeReady) return;
+    if (!role && !roleLoaded) return;
 
     async function loadTabTotal(query: string, setter: (n: number) => void) {
-      const res = await fetch(`/api/jobs?${query}`);
-      const data = (await res.json().catch(() => null)) as PaginatedJobsResponse | null;
+      const data = await fastGet<PaginatedJobsResponse | { error?: string } | null>(
+        `/api/jobs?${query}`,
+        { ttlMs: 60_000 }
+      );
       if (data && "total" in data) {
         setter(data.total);
       }
@@ -254,11 +258,10 @@ function PendingJobsContent() {
         setWarrantyTotal
       );
     }
-  }, [roleLoaded, role, scope, scopeReady]);
+  }, [roleLoaded, role, scope]);
 
   useEffect(() => {
-    if (!roleLoaded) return;
-    if (role === "technician" && !scopeReady) return;
+    if (!role && !roleLoaded) return;
 
     // My Jobs has no Warranty/Outsourced tabs — reset if we switched from All Jobs.
     if (
@@ -277,7 +280,6 @@ function PendingJobsContent() {
   }, [
     page,
     scope,
-    scopeReady,
     role,
     roleLoaded,
     statusFilter,
@@ -518,7 +520,7 @@ function PendingJobsContent() {
         </div>
       )}
 
-      {loading ? (
+      {loading && jobs.length === 0 ? (
         <p className="text-center text-sm text-slate-500">Loading…</p>
       ) : jobs.length === 0 ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-center">

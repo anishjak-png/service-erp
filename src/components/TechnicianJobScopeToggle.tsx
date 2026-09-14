@@ -1,29 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 export type TechnicianJobScope = "my" | "all";
 
 const STORAGE_KEY = "technicianJobScope";
 
-export function useTechnicianJobScope() {
-  const [scope, setScopeState] = useState<TechnicianJobScope>("my");
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
+function readStoredScope(): TechnicianJobScope {
+  if (typeof window === "undefined") return "my";
+  try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === "my" || saved === "all") {
-      setScopeState(saved);
-    }
-    setReady(true);
-  }, []);
+    if (saved === "my" || saved === "all") return saved;
+  } catch {
+    /* ignore */
+  }
+  return "my";
+}
+
+export function useTechnicianJobScope() {
+  const [scope, setScopeState] = useState<TechnicianJobScope>(readStoredScope);
 
   const setScope = useCallback((next: TechnicianJobScope) => {
     setScopeState(next);
-    localStorage.setItem(STORAGE_KEY, next);
+    try {
+      localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
-  return { scope, setScope, ready };
+  return { scope, setScope, ready: true as const };
 }
 
 export function TechnicianJobScopeToggle({
