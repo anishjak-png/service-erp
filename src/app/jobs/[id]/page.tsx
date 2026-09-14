@@ -469,6 +469,22 @@ export default function JobDetailPage() {
     if (status === "Ready") {
       if (role !== "verifier" && role !== "admin") return;
       setRackDetail(job?.rackDetail ?? "");
+      setReadyServiceCharge(
+        amountInputValue(
+          job?.serviceCharge != null
+            ? job.serviceCharge
+            : job?.sparesAmount == null
+              ? job?.serviceAmount
+              : null
+        )
+      );
+      setReadySparesAmount(amountInputValue(job?.sparesAmount));
+      setReadyServiceKind(
+        job?.serviceKind && isServiceKind(job.serviceKind)
+          ? job.serviceKind
+          : ""
+      );
+      setReadyShowErrors(false);
       setShowVerifyReadyForm(true);
       return;
     }
@@ -601,7 +617,31 @@ export default function JobDetailPage() {
       alert("Enter the rack where the product is placed");
       return;
     }
-    await updateJob({ status: "Ready", rackDetail: rack });
+    const chargeMissing = readyServiceCharge.trim() === "";
+    const kindMissing = !isServiceKind(readyServiceKind);
+    if (chargeMissing || kindMissing) {
+      setReadyShowErrors(true);
+      return;
+    }
+    const serviceCharge = Number(readyServiceCharge);
+    const sparesAmount =
+      readySparesAmount.trim() === "" ? 0 : Number(readySparesAmount);
+    if (
+      Number.isNaN(serviceCharge) ||
+      serviceCharge < 0 ||
+      Number.isNaN(sparesAmount) ||
+      sparesAmount < 0
+    ) {
+      alert("Enter valid amounts (0 or more)");
+      return;
+    }
+    await updateJob({
+      status: "Ready",
+      rackDetail: rack,
+      serviceCharge,
+      serviceKind: readyServiceKind,
+      sparesAmount,
+    });
   }
 
   async function handleSaveRemarks() {
@@ -795,8 +835,10 @@ export default function JobDetailPage() {
   const showFinancials =
     role === "technician" || role === "reception" || role === "admin";
   const isLocked = isDeliveredTerminal(job.status) && !isAdmin;
-  const canAdminEditAmount =
-    isAdmin && (job.readyAt != null || job.completedAt != null) && !isLocked;
+  const canEditAmount =
+    (isAdmin || role === "verifier") &&
+    (job.readyAt != null || job.completedAt != null) &&
+    !isLocked;
   const canEditAssignee =
     isStaff && !isLocked && !job.isWarranty && job.status !== "Outsourced";
 
@@ -1022,7 +1064,114 @@ export default function JobDetailPage() {
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 shadow-sm space-y-2">
             <h3 className="text-sm font-semibold text-emerald-900">Mark Ready</h3>
             <p className="text-xs text-emerald-800">
-              Confirm the job and enter the rack. This sends the WhatsApp ready message.
+              Check or edit amounts, then enter the rack. This sends the WhatsApp ready message.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label
+                  className={`mb-1 block text-xs font-medium ${
+                    readyShowErrors && readyServiceCharge.trim() === ""
+                      ? "text-red-700"
+                      : "text-emerald-900"
+                  }`}
+                >
+                  Service charge *
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  required
+                  value={readyServiceCharge}
+                  onChange={(e) => setReadyServiceCharge(e.target.value)}
+                  onFocus={(e) => {
+                    if (e.target.value === "0") setReadyServiceCharge("");
+                    else e.target.select();
+                  }}
+                  placeholder="Required"
+                  className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 ${
+                    readyShowErrors && readyServiceCharge.trim() === ""
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : "border-slate-300 focus-visible:ring-emerald-500"
+                  }`}
+                />
+                {readyShowErrors && readyServiceCharge.trim() === "" && (
+                  <p className="mt-0.5 text-xs text-red-600">Enter value</p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-emerald-900">
+                  Spares amount
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={readySparesAmount}
+                  onChange={(e) => setReadySparesAmount(e.target.value)}
+                  onFocus={(e) => {
+                    if (e.target.value === "0") setReadySparesAmount("");
+                    else e.target.select();
+                  }}
+                  placeholder="0"
+                  className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                />
+              </div>
+            </div>
+            <p
+              className={`text-xs font-medium ${
+                readyShowErrors && !isServiceKind(readyServiceKind)
+                  ? "text-red-700"
+                  : "text-emerald-900"
+              }`}
+            >
+              Service type *
+            </p>
+            <div
+              className={`flex gap-4 text-sm ${
+                readyShowErrors && !isServiceKind(readyServiceKind)
+                  ? "text-red-700"
+                  : "text-emerald-900"
+              }`}
+            >
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={readyServiceKind === "minor"}
+                  onChange={() =>
+                    setReadyServiceKind((prev) =>
+                      prev === "minor" ? "" : "minor"
+                    )
+                  }
+                />
+                Minor service
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={readyServiceKind === "major"}
+                  onChange={() =>
+                    setReadyServiceKind((prev) =>
+                      prev === "major" ? "" : "major"
+                    )
+                  }
+                />
+                Major service
+              </label>
+            </div>
+            {readyShowErrors && !isServiceKind(readyServiceKind) && (
+              <p className="-mt-1 text-xs text-red-600">Enter value</p>
+            )}
+            <p className="text-sm font-semibold text-emerald-900">
+              Total{" "}
+              {formatCurrency(
+                (readyServiceCharge.trim() === ""
+                  ? 0
+                  : Number(readyServiceCharge) || 0) +
+                  (readySparesAmount.trim() === ""
+                    ? 0
+                    : Number(readySparesAmount) || 0)
+              )}
             </p>
             <div>
               <label className="mb-1 block text-xs font-medium text-emerald-900">
@@ -1046,7 +1195,10 @@ export default function JobDetailPage() {
                 Confirm Ready
               </button>
               <button
-                onClick={() => setShowVerifyReadyForm(false)}
+                onClick={() => {
+                  setReadyShowErrors(false);
+                  setShowVerifyReadyForm(false);
+                }}
                 className="flex-1 rounded-md border border-slate-300 bg-white py-2.5 text-sm"
               >
                 Cancel
@@ -1161,6 +1313,8 @@ export default function JobDetailPage() {
 
         <CompactCard title="Actions">
           {!showReadyForm &&
+            !showVerifyReadyForm &&
+            !showReturnForm &&
             !showOutsourceForm &&
             !showConvertWarrantyForm && (
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
@@ -1645,10 +1799,10 @@ export default function JobDetailPage() {
           </p>
         )}
 
-        {(canAdminEditAmount && !showAmountEdit) ||
+        {(canEditAmount && !showAmountEdit) ||
         (isAdmin && job.readyAt && !showCompletedByEdit) ? (
           <div className="flex flex-wrap gap-1.5">
-            {canAdminEditAmount && !showAmountEdit && (
+            {canEditAmount && !showAmountEdit && (
               <button
                 type="button"
                 onClick={() => {
@@ -1718,7 +1872,7 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {showAmountEdit && isAdmin && (
+        {showAmountEdit && (isAdmin || role === "verifier") && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
             <h3 className="text-sm font-semibold text-amber-900">Edit bill amounts</h3>
             <div className="grid grid-cols-2 gap-2">

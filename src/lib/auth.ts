@@ -54,7 +54,7 @@ export function canReopenDeliveredJob(role: StaffRole) {
 }
 
 export function canEditServiceAmount(role: StaffRole) {
-  return role === "admin";
+  return role === "admin" || role === "verifier";
 }
 
 export function canEditCompletedBy(role: StaffRole) {

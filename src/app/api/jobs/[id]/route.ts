@@ -108,7 +108,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       !canEditServiceAmount(session.role)
     ) {
       return NextResponse.json(
-        { error: "Only admin can edit service amount after the job is completed" },
+        { error: "Only admin or verifier can edit service amount after the job is completed" },
         { status: 403 }
       );
     }
@@ -322,6 +322,40 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           );
         }
         data.rackDetail = rack;
+        if (
+          body.serviceCharge !== undefined ||
+          body.sparesAmount !== undefined ||
+          body.serviceAmount !== undefined
+        ) {
+          const parsed = resolveBillSplit(body);
+          if (!parsed) {
+            return NextResponse.json(
+              { error: "Invalid service or spares amount" },
+              { status: 400 }
+            );
+          }
+          if (body.serviceCharge === undefined || body.serviceCharge === "") {
+            return NextResponse.json(
+              { error: "Service charge is required" },
+              { status: 400 }
+            );
+          }
+          if (
+            !isServiceKind(body.serviceKind) &&
+            !isServiceKind(existing.serviceKind)
+          ) {
+            return NextResponse.json(
+              { error: "Select minor or major service" },
+              { status: 400 }
+            );
+          }
+          data.serviceCharge = parsed.serviceCharge;
+          data.sparesAmount = parsed.sparesAmount;
+          data.serviceAmount = parsed.serviceAmount;
+          if (isServiceKind(body.serviceKind)) {
+            data.serviceKind = body.serviceKind;
+          }
+        }
         if (!existing.readyAt) {
           data.readyAt = new Date();
         }
