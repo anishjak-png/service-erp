@@ -9,6 +9,8 @@ import {
 import { getSession } from "@/lib/session";
 import { requireTenantId } from "@/lib/tenant";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const session = await getSession();
 
@@ -24,21 +26,43 @@ export default async function DashboardPage() {
     redirect("/jobs/ready");
   }
 
-  const tenantId = requireTenantId(session);
+  let tenantId: string;
+  try {
+    tenantId = requireTenantId(session);
+  } catch {
+    redirect("/?reauth=1");
+  }
 
-  if (session.role === "admin") {
-    const data = await getAdminDashboardData(tenantId);
+  try {
+    if (session.role === "admin") {
+      const data = await getAdminDashboardData(tenantId);
+      return (
+        <AppShell>
+          <AdminDashboard data={data} />
+        </AppShell>
+      );
+    }
+
+    const data = await getReceptionDashboardData(tenantId);
     return (
       <AppShell>
-        <AdminDashboard data={data} />
+        <ReceptionDashboard data={data} />
+      </AppShell>
+    );
+  } catch (err) {
+    console.error("[dashboard]", err);
+    return (
+      <AppShell>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            Home could not load
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            The dashboard could not read jobs just now. Open Pending or tap Home
+            again.
+          </p>
+        </div>
       </AppShell>
     );
   }
-
-  const data = await getReceptionDashboardData(tenantId);
-  return (
-    <AppShell>
-      <ReceptionDashboard data={data} />
-    </AppShell>
-  );
 }

@@ -17,7 +17,7 @@ function runtimeDatabaseUrl(): string | undefined {
     base.includes(":6543/") || params.get("pgbouncer") === "true";
   if (usesPooler) {
     params.set("pgbouncer", "true");
-    params.set("connection_limit", "1");
+    params.set("connection_limit", "5");
   }
   const qs = params.toString();
   return qs ? `${base}?${qs}` : base;
