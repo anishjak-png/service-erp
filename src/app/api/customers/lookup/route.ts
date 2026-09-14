@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   const mobile = normalizeMobile(
     request.nextUrl.searchParams.get("mobile") ?? ""
   );
+  const slim = request.nextUrl.searchParams.get("slim") === "1";
 
   if (mobile.length !== 10) {
     return NextResponse.json({ error: "Valid mobile required" }, { status: 400 });
@@ -17,12 +18,26 @@ export async function GET(request: NextRequest) {
 
   const customer = await prisma.customer.findUnique({
     where: { tenantId_mobile: { tenantId, mobile } },
-    include: {
-      jobCards: {
-        where: { tenantId },
-        orderBy: { receivedAt: "desc" },
-        take: 5,
-      },
+    select: {
+      name: true,
+      address: true,
+      mobile: true,
+      allowWhatsappNotifications: true,
+      jobCards: slim
+        ? false
+        : {
+            where: { tenantId },
+            orderBy: { receivedAt: "desc" },
+            take: 5,
+            select: {
+              id: true,
+              jobNumber: true,
+              status: true,
+              applianceType: true,
+              brand: true,
+              receivedAt: true,
+            },
+          },
     },
   });
 
@@ -36,6 +51,6 @@ export async function GET(request: NextRequest) {
     address: customer.address,
     mobile: customer.mobile,
     allowWhatsappNotifications: customer.allowWhatsappNotifications,
-    recentJobs: customer.jobCards,
+    recentJobs: customer.jobCards ?? [],
   });
 }

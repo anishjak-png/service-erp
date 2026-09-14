@@ -6,6 +6,7 @@ import { JobListCard } from "@/components/JobListCard";
 import { JobStatusBadge } from "@/components/JobStatusBadge";
 import type { DeliveryContactStatus } from "@prisma/client";
 import { formatDoneDatestamp } from "@/lib/jobs";
+import { fastGet, peekFastCache, invalidateJobCaches } from "@/lib/fast-fetch";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -39,24 +40,28 @@ export default function DeliveryContent() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadJobs = useCallback(async (q: string) => {
-    setLoading(true);
     setSuccessMsg("");
     const params = new URLSearchParams({ delivery: "true" });
     if (q.trim()) params.set("q", q.trim());
+    const url = `/api/jobs?${params}`;
+    const warm = peekFastCache<DeliveryJob[]>(url, 8_000);
+    if (Array.isArray(warm)) {
+      setResults(warm.filter((j) => DELIVERY_STATUSES.has(j.status)));
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
 
-    const res = await fetch(`/api/jobs?${params}`);
-    if (!res.ok) {
+    const data = await fastGet<DeliveryJob[] | { error?: string }>(url, {
+      ttlMs: 8_000,
+    });
+    if (!data || !Array.isArray(data)) {
       setResults([]);
       setLoading(false);
       return;
     }
 
-    const data = await res.json();
-    setResults(
-      Array.isArray(data)
-        ? data.filter((j: DeliveryJob) => DELIVERY_STATUSES.has(j.status))
-        : []
-    );
+    setResults(data.filter((j) => DELIVERY_STATUSES.has(j.status)));
     setLoading(false);
   }, []);
 
@@ -67,7 +72,7 @@ export default function DeliveryContent() {
   function handleQueryChange(value: string) {
     setQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => loadJobs(value), 350);
+    debounceRef.current = setTimeout(() => loadJobs(value), 80);
   }
 
   function handleSearch(e: FormEvent) {
@@ -106,6 +111,7 @@ export default function DeliveryContent() {
     });
 
     if (res.ok) {
+      invalidateJobCaches();
       setResults((prev) => prev.filter((j) => j.id !== job.id));
       setSuccessMsg(`${job.jobNumber} marked as delivered`);
     } else {

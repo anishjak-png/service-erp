@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { fastGet } from "@/lib/fast-fetch";
 
 type LookupCategory = "appliance" | "brand" | "complaint";
 
@@ -74,8 +75,9 @@ export function CreatableSelect({
       return values;
     }
 
-    const res = await fetch(`/api/lookups?category=${category}`);
-    const data = await res.json();
+    const data = await fastGet<unknown>(`/api/lookups?category=${category}`, {
+      ttlMs: 120_000,
+    });
     const values = Array.isArray(data)
       ? data.map((o: { value: string }) => o.value)
       : [];

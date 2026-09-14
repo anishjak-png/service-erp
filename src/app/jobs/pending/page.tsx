@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, Suspense } from "react";
+import { fastGet, peekFastCache } from "@/lib/fast-fetch";
 
 type PendingJob = {
   id: string;
@@ -140,8 +141,6 @@ function PendingJobsContent() {
       partnerId: string,
       brand: string
     ) => {
-      setLoading(true);
-
       const params = new URLSearchParams({
         page: String(pageNumber),
         limit: String(JOBS_PAGE_SIZE),
@@ -162,17 +161,30 @@ function PendingJobsContent() {
         }
       }
 
+      const url = `/api/jobs?${params}`;
+      const warm = peekFastCache<PaginatedJobsResponse>(url, 8_000);
+      if (warm && "items" in warm) {
+        setJobs(sortBoardJobs(parseActiveJobs(warm.items)));
+        setTotal(warm.total);
+        setPage(warm.page);
+        setTotalPages(warm.totalPages);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
       try {
-        const res = await fetch(`/api/jobs?${params}`);
-        const data = (await res.json().catch(() => null)) as
+        const data = (await fastGet<
+          PaginatedJobsResponse | { error?: string } | null
+        >(url, { ttlMs: 8_000 })) as
           | PaginatedJobsResponse
           | { error?: string }
           | null;
 
-        if (!res.ok || !data || !("items" in data)) {
+        if (!data || !("items" in data)) {
           console.error(
             "[pending jobs]",
-            data && "error" in data ? data.error : res.status
+            data && "error" in data ? data.error : "invalid response"
           );
           setJobs([]);
           setTotal(0);
@@ -193,19 +205,20 @@ function PendingJobsContent() {
 
   useEffect(() => {
     if (!roleLoaded || role !== "technician") return;
-    fetch("/api/technician/stats")
-      .then((r) => r.json())
-      .then(setStats);
+    void fastGet<TechnicianStats>("/api/technician/stats", { ttlMs: 8_000 }).then(
+      (data) => {
+        if (data && "pending" in data) setStats(data);
+      }
+    );
   }, [role, roleLoaded]);
 
   useEffect(() => {
     if (!roleLoaded) return;
-    fetch("/api/outsource-partners")
-      .then((r) => r.json())
-      .then((data) => {
+    void fastGet<unknown>("/api/outsource-partners", { ttlMs: 120_000 }).then(
+      (data) => {
         if (Array.isArray(data)) setPartners(data);
-      })
-      .catch(() => setPartners([]));
+      }
+    );
   }, [roleLoaded]);
 
   useEffect(() => {

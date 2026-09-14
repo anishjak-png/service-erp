@@ -254,7 +254,7 @@ async function browseJobsResponse(params: {
     where,
     select: getJobListSelect(),
     orderBy: { receivedAt: "desc" },
-    take: 100,
+    take: 40,
   });
 
   return NextResponse.json({
@@ -369,12 +369,7 @@ async function searchJobs(request: NextRequest) {
       },
       select: getJobListSelect(),
       orderBy: { receivedAt: "desc" },
-    });
-  }
-
-  async function totalVisitsForCustomer(id: string) {
-    return prisma.jobCard.count({
-      where: { ...tenantFilter, customerId: id, ...scopeWhere },
+      take: 40,
     });
   }
 
@@ -382,10 +377,7 @@ async function searchJobs(request: NextRequest) {
     customer: { id: string; name: string | null; mobile: string },
     searchType: "mobile" | "name"
   ) {
-    const [jobs, totalVisits] = await Promise.all([
-      jobsForCustomer(customer.id),
-      totalVisitsForCustomer(customer.id),
-    ]);
+    const jobs = await jobsForCustomer(customer.id);
     return NextResponse.json({
       mode: "jobs",
       searchType,
@@ -394,7 +386,7 @@ async function searchJobs(request: NextRequest) {
         name: customer.name,
         mobile: customer.mobile,
       },
-      totalVisits,
+      totalVisits: jobs.length,
       jobs,
     });
   }
@@ -416,12 +408,15 @@ async function searchJobs(request: NextRequest) {
   }
 
   if (!q) {
-    return NextResponse.json({
-      mode: "jobs",
-      searchType: "empty",
-      customer: null,
-      jobs: [],
-    });
+    return NextResponse.json(
+      {
+        mode: "jobs",
+        searchType: "empty",
+        customer: null,
+        jobs: [],
+      },
+      { headers: { "Cache-Control": "private, max-age=5" } }
+    );
   }
 
   const searchType = detectSearchQueryType(q);
@@ -475,19 +470,27 @@ async function searchJobs(request: NextRequest) {
     });
   }
 
+  const digits = q.replace(/\D/g, "");
+  const mobileTyped = digits.length >= 2 && /^[\d\s+\-()]+$/.test(q);
   const customers = await prisma.customer.findMany({
     where: {
       ...tenantFilter,
-      name: { contains: q, mode: "insensitive" },
+      ...(mobileTyped
+        ? { mobile: { startsWith: digits } }
+        : {
+            OR: [
+              { name: { startsWith: q, mode: "insensitive" } },
+              { name: { contains: q, mode: "insensitive" } },
+            ],
+          }),
     },
     select: {
       id: true,
       name: true,
       mobile: true,
-      _count: { select: { jobCards: true } },
     },
     orderBy: { name: "asc" },
-    take: 20,
+    take: 12,
   });
 
   if (customers.length === 0) {
@@ -510,7 +513,7 @@ async function searchJobs(request: NextRequest) {
       id: c.id,
       name: c.name,
       mobile: c.mobile,
-      jobCount: c._count.jobCards,
+      jobCount: 0,
     })),
   });
 }

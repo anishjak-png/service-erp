@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { fastGet, prefetchStaffCaches } from "@/lib/fast-fetch";
 
 export type StaffRole = "reception" | "technician" | "admin" | "verifier";
 
@@ -61,21 +62,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshAuth = useCallback(async () => {
     try {
-      const r = await fetch("/api/auth/me");
-      const data = await r.json();
-      setAuth({
-        isLoggedIn: Boolean(data.isLoggedIn),
-        role: data.role ?? null,
-        staffName: data.staffName ?? null,
-        tenantName: data.tenantName ?? null,
-        technicianId: data.technicianId ?? null,
-        technicianName: data.technicianName ?? null,
-        deviceStatus: data.deviceStatus ?? null,
-        deviceApproved: Boolean(data.deviceApproved),
-        pendingDeviceCount: data.pendingDeviceCount ?? 0,
-        unreadAlertCount: data.unreadAlertCount ?? 0,
-        loaded: true,
+      const data = await fastGet<Record<string, unknown>>("/api/auth/me", {
+        skipCache: true,
       });
+      const next: AuthState = {
+        isLoggedIn: Boolean(data.isLoggedIn),
+        role: (data.role as StaffRole | null) ?? null,
+        staffName: (data.staffName as string | null) ?? null,
+        tenantName: (data.tenantName as string | null) ?? null,
+        technicianId: (data.technicianId as string | null) ?? null,
+        technicianName: (data.technicianName as string | null) ?? null,
+        deviceStatus:
+          (data.deviceStatus as AuthState["deviceStatus"]) ?? null,
+        deviceApproved: Boolean(data.deviceApproved),
+        pendingDeviceCount: Number(data.pendingDeviceCount ?? 0),
+        unreadAlertCount: Number(data.unreadAlertCount ?? 0),
+        loaded: true,
+      };
+      setAuth(next);
+      if (next.isLoggedIn && next.deviceApproved) {
+        prefetchStaffCaches();
+      }
     } catch {
       setAuth((prev) => ({ ...prev, loaded: true }));
     }

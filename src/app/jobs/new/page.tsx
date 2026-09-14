@@ -12,6 +12,7 @@ import {
   pickNativePhoto,
 } from "@/lib/native-photo";
 import { useAuth } from "@/components/AuthProvider";
+import { fastGet, invalidateJobCaches } from "@/lib/fast-fetch";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,14 +72,15 @@ export default function NewJobPage() {
   const [warrantyCardError, setWarrantyCardError] = useState("");
 
   useEffect(() => {
-    fetch("/api/lookups?category=appliance")
-      .then((r) => r.json())
-      .then((data: LookupOptions["appliance"]) => {
-        setLookupOptions((prev) => ({
-          ...prev,
-          appliance: data?.map((o) => o.value) ?? [],
-        }));
-      });
+    void fastGet<LookupOptions["appliance"]>("/api/lookups?category=appliance", {
+      ttlMs: 120_000,
+    }).then((data) => {
+      if (!Array.isArray(data)) return;
+      setLookupOptions((prev) => ({
+        ...prev,
+        appliance: data.map((o) => o.value),
+      }));
+    });
   }, []);
 
   const loadProductLookups = useCallback(async (appliance: string) => {
@@ -89,11 +91,16 @@ export default function NewJobPage() {
 
     setLookupsLoading(true);
     try {
-      const res = await fetch(
-        `/api/appliance-lookups?applianceType=${encodeURIComponent(appliance)}`
+      const data = await fastGet<{
+        brands?: string[];
+        complaints?: string[];
+        accessories?: string[];
+        error?: string;
+      }>(
+        `/api/appliance-lookups?applianceType=${encodeURIComponent(appliance)}`,
+        { ttlMs: 120_000 }
       );
-      const data = await res.json();
-      if (!res.ok) {
+      if (!data || !("brands" in data)) {
         setLookupOptions((prev) => ({ ...prev, brand: [], complaint: [], accessory: [] }));
         return;
       }
@@ -129,8 +136,11 @@ export default function NewJobPage() {
     lookupMobileRef.current = digits;
     if (digits.length !== 10) return;
 
-    const res = await fetch(`/api/customers/lookup?mobile=${digits}`);
-    const data = await res.json();
+    const data = await fastGet<{
+      found?: boolean;
+      name?: string | null;
+      allowWhatsappNotifications?: boolean;
+      }>(`/api/customers/lookup?mobile=${digits}&slim=1`, { ttlMs: 30_000 });
     if (lookupMobileRef.current !== digits) return;
     if (data.found) {
       if (data.name) setCustomerName(data.name);
@@ -143,11 +153,12 @@ export default function NewJobPage() {
   }, []);
 
   async function fetchAssignedTech(appliance: string) {
-    const res = await fetch("/api/appliance-technicians");
-    const mappings = await res.json();
-    const match = mappings.find(
-      (m: { applianceType: string; technician: { name: string } }) =>
-        m.applianceType === appliance
+    const mappings = await fastGet<
+      Array<{ applianceType: string; technician: { name: string } }> | { error?: string }
+    >("/api/appliance-technicians", { ttlMs: 120_000 });
+    const list = Array.isArray(mappings) ? mappings : [];
+    const match = list.find(
+      (m) => m.applianceType === appliance
     );
     setAssignedTechName(match?.technician?.name ?? null);
   }
@@ -446,6 +457,7 @@ export default function NewJobPage() {
     }
 
     setCreatedJob(data as unknown as CreatedJob);
+    invalidateJobCaches();
     setLoading(false);
   }
 

@@ -40,6 +40,7 @@ import {
   isPhotoPickerCancelled,
   pickNativePhoto,
 } from "@/lib/native-photo";
+import { fastGet, invalidateJobCaches } from "@/lib/fast-fetch";
 import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -289,14 +290,15 @@ export default function JobDetailPage() {
   }
 
   const fetchJob = useCallback(async () => {
-    const jobRes = await fetch(`/api/jobs/${id}`);
+    const data = await fastGet<JobDetail | { error?: string }>(`/api/jobs/${id}`, {
+      ttlMs: 8_000,
+    });
 
-    if (!jobRes.ok) {
+    if (!data || "error" in data || !("jobNumber" in data)) {
       router.push("/jobs/pending");
       return;
     }
 
-    const data = await jobRes.json();
     setJob(data);
     setRemarks(data.remarks ?? "");
     setReadyServiceCharge(
@@ -376,6 +378,7 @@ export default function JobDetailPage() {
       body: JSON.stringify(updates),
     });
     if (res.ok) {
+      invalidateJobCaches();
       const data = (await res.json()) as JobPatchResponse;
       setJob((prev) => (prev ? mergeJobPatch(prev, data) : prev));
       if (data.remarks !== undefined) setRemarks(data.remarks ?? "");

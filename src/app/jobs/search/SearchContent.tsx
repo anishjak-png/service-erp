@@ -16,6 +16,11 @@ import {
 } from "@/lib/job-assignee-display";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fastGet, peekFastCache } from "@/lib/fast-fetch";
+import {
+  matchDirectoryCustomers,
+  type DirectoryCustomer,
+} from "@/lib/customer-directory";
 
 type JobResult = {
   id: string;
@@ -131,8 +136,17 @@ export default function SearchContent() {
   const [warrantyBrands, setWarrantyBrands] = useState<string[]>([]);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [directory, setDirectory] = useState<DirectoryCustomer[]>([]);
   const { scope, setScope, ready: scopeReady } = useTechnicianJobScope();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    void fastGet<DirectoryCustomer[]>("/api/customers/directory", {
+      ttlMs: 300_000,
+    }).then((data) => {
+      if (Array.isArray(data)) setDirectory(data);
+    });
+  }, []);
 
   const search = useCallback(
     async (
@@ -158,7 +172,6 @@ export default function SearchContent() {
         warranty?: boolean;
       } = {}
     ) => {
-      setLoading(true);
       const params = new URLSearchParams();
       if (selectedCustomerId) {
         params.set("customerId", selectedCustomerId);
@@ -193,13 +206,21 @@ export default function SearchContent() {
         params.set("warrantyBrand", browse.warrantyBrand);
       }
 
-      const res = await fetch(`/api/jobs/search?${params}`);
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        console.error(
-          "[job search]",
-          (data as { error?: string } | null)?.error ?? res.status
-        );
+      const url = `/api/jobs/search?${params}`;
+      const warm = peekFastCache<SearchResponse>(url, 12_000);
+      if (warm && !("error" in warm)) {
+        setResponse(warm);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+      const cached = await fastGet<SearchResponse | { error?: string }>(url, {
+        ttlMs: 12_000,
+      });
+      if (!cached || !("mode" in cached)) {
+        if (cached && "error" in cached) {
+          console.error("[job search]", cached.error);
+        }
         setResponse({
           mode: "jobs",
           searchType: "empty",
@@ -209,7 +230,7 @@ export default function SearchContent() {
         setLoading(false);
         return;
       }
-      setResponse(data as SearchResponse);
+      setResponse(cached);
       setLoading(false);
     },
     []
@@ -424,10 +445,55 @@ export default function SearchContent() {
     if (customerId) setCustomerId("");
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
+
+    const trimmed = value.trim();
+    const digits = trimmed.replace(/\D/g, "");
+    const utLike = /^[a-z]{1,6}[\s-]?\d+$/i.test(trimmed);
+    const completeMobile =
+      digits.length === 10 && /^[\d\s+\-()]+$/.test(trimmed);
+
+    const run = () => {
       updateUrl(value, statusFilter, "");
       runSearch(value, statusFilter, "");
-    }, 350);
+    };
+
+    if (!trimmed) {
+      setResponse({
+        mode: "jobs",
+        searchType: "empty",
+        customer: null,
+        jobs: [],
+      });
+      setLoading(false);
+      debounceRef.current = setTimeout(run, 80);
+      return;
+    }
+
+    if (!utLike && !completeMobile && directory.length > 0) {
+      const picks = matchDirectoryCustomers(directory, trimmed);
+      if (picks.length > 0) {
+        setResponse({
+          mode: "customer_pick",
+          searchType: "name",
+          customers: picks.map((c) => ({ ...c, jobCount: 0 })),
+        });
+        setLoading(false);
+        if (picks.length === 1) {
+          void fastGet(
+            `/api/jobs/search?customerId=${encodeURIComponent(picks[0].id)}`,
+            { ttlMs: 12_000 }
+          );
+        }
+        return;
+      }
+    }
+
+    if (completeMobile || utLike) {
+      run();
+      return;
+    }
+
+    debounceRef.current = setTimeout(run, 80);
   }
 
   function selectCustomer(pick: CustomerPick) {

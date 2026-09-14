@@ -3,8 +3,8 @@ import { AppShell } from "@/components/AppShell";
 import { AdminDashboard } from "@/components/dashboard/AdminDashboard";
 import { ReceptionDashboard } from "@/components/dashboard/ReceptionDashboard";
 import {
-  getAdminDashboardData,
-  getReceptionDashboardData,
+  getAdminDashboardDataCached,
+  getReceptionDashboardDataCached,
 } from "@/lib/dashboard-data";
 import { getSession } from "@/lib/session";
 import { requireTenantId } from "@/lib/tenant";
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
 
   try {
     if (session.role === "admin") {
-      const data = await getAdminDashboardData(tenantId);
+      const data = await getAdminDashboardDataCached(tenantId);
       return (
         <AppShell>
           <AdminDashboard data={data} />
@@ -43,7 +43,7 @@ export default async function DashboardPage() {
       );
     }
 
-    const data = await getReceptionDashboardData(tenantId);
+    const data = await getReceptionDashboardDataCached(tenantId);
     return (
       <AppShell>
         <ReceptionDashboard data={data} />

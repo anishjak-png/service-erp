@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { JobListCard } from "@/components/JobListCard";
 import { useAuth } from "@/components/AuthProvider";
+import { fastGet } from "@/lib/fast-fetch";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -30,8 +31,10 @@ export default function ReadyVerificationPage() {
   const allowed = role === "verifier" || role === "admin";
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/jobs?status=JobCompleted");
-    const data = await res.json();
+    const data = await fastGet<ReadyJob[] | { error?: string }>(
+      "/api/jobs?status=JobCompleted",
+      { ttlMs: 8_000 }
+    );
     setJobs(Array.isArray(data) ? data : []);
     setLoading(false);
   }, []);

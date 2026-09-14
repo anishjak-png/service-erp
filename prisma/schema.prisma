@@ -60,6 +60,7 @@ model Customer {
 
   @@unique([tenantId, mobile])
   @@index([tenantId])
+  @@index([tenantId, name])
 }
 
 enum JobStatus {

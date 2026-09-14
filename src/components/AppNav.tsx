@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { APP_NAME } from "@/lib/constants";
 import { useAuth } from "./AuthProvider";
+import { invalidateFastCache, fastGet } from "@/lib/fast-fetch";
 
 type NavLink = { href: string; label: string };
 
@@ -122,6 +123,7 @@ export function AppNav() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
+    invalidateFastCache();
     await refreshAuth();
     router.push("/");
     router.refresh();
@@ -149,10 +151,19 @@ export function AppNav() {
           </div>
           {showUniversalSearch && (
             <form onSubmit={handleUniversalSearch} className="flex gap-1.5">
-              <input
+          <input
                 type="search"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSearchQuery(value);
+                  const q = value.trim();
+                  if (q.length >= 2) {
+                    void fastGet(`/api/jobs/search?q=${encodeURIComponent(q)}`, {
+                      ttlMs: 12_000,
+                    });
+                  }
+                }}
                 placeholder="Search UT, mobile, or name"
                 className="h-8 min-w-0 flex-1 rounded-md border border-emerald-600 bg-emerald-950/40 px-2.5 text-sm text-white placeholder:text-emerald-300/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               />

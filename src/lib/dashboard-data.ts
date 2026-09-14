@@ -167,3 +167,28 @@ export async function getAdminDashboardData(tenantId: string) {
     })),
   };
 }
+
+const DASH_TTL_MS = 12_000;
+const dashMemory = new Map<string, { at: number; data: unknown }>();
+
+export async function getReceptionDashboardDataCached(tenantId: string) {
+  const key = `reception:${tenantId}`;
+  const hit = dashMemory.get(key);
+  if (hit && Date.now() - hit.at < DASH_TTL_MS) {
+    return hit.data as Awaited<ReturnType<typeof getReceptionDashboardData>>;
+  }
+  const data = await getReceptionDashboardData(tenantId);
+  dashMemory.set(key, { at: Date.now(), data });
+  return data;
+}
+
+export async function getAdminDashboardDataCached(tenantId: string) {
+  const key = `admin:${tenantId}`;
+  const hit = dashMemory.get(key);
+  if (hit && Date.now() - hit.at < DASH_TTL_MS) {
+    return hit.data as Awaited<ReturnType<typeof getAdminDashboardData>>;
+  }
+  const data = await getAdminDashboardData(tenantId);
+  dashMemory.set(key, { at: Date.now(), data });
+  return data;
+}

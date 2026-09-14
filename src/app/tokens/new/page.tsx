@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { CreatableSelect } from "@/components/CreatableSelect";
 import { useAuth } from "@/components/AuthProvider";
 import { TOKEN_ESTIMATE_PRESETS } from "@/lib/constants";
+import { fastGet } from "@/lib/fast-fetch";
 import Link from "next/link";
 import { FormEvent, useCallback, useRef, useState } from "react";
 
@@ -30,8 +31,10 @@ export default function NewTokenPage() {
     lookupMobileRef.current = digits;
     if (digits.length !== 10) return;
 
-    const res = await fetch(`/api/customers/lookup?mobile=${digits}`);
-    const data = await res.json();
+    const data = await fastGet<{ found?: boolean; name?: string | null }>(
+      `/api/customers/lookup?mobile=${digits}&slim=1`,
+      { ttlMs: 30_000 }
+    );
     if (lookupMobileRef.current !== digits) return;
     if (data.found && data.name) {
       setCustomerName(data.name);
