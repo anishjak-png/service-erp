@@ -240,6 +240,8 @@ export default function JobDetailPage() {
   const [rackDetail, setRackDetail] = useState("");
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [returnNote, setReturnNote] = useState("");
+  const [showWaitingForm, setShowWaitingForm] = useState(false);
+  const [waitingNote, setWaitingNote] = useState("");
   const [showAmountEdit, setShowAmountEdit] = useState(false);
   const [editShowErrors, setEditShowErrors] = useState(false);
   const [editServiceCharge, setEditServiceCharge] = useState("");
@@ -406,6 +408,8 @@ export default function JobDetailPage() {
       if (data.rackDetail !== undefined) setRackDetail(data.rackDetail ?? "");
       setShowReturnForm(false);
       setReturnNote("");
+      setShowWaitingForm(false);
+      setWaitingNote("");
       setShowAmountEdit(false);
       setEditShowErrors(false);
       setShowOutsourceForm(false);
@@ -488,12 +492,30 @@ export default function JobDetailPage() {
       setShowVerifyReadyForm(true);
       return;
     }
+    if (status === "WaitingForCustomerApproval") {
+      setWaitingNote("");
+      setShowWaitingForm(true);
+      return;
+    }
     if (status === "Return") {
       setReturnNote("");
       setShowReturnForm(true);
       return;
     }
     await updateJob({ status });
+  }
+
+  async function confirmWaitingApproval() {
+    const note = waitingNote.trim();
+    if (!note) {
+      alert("Enter the reason or remarks");
+      return;
+    }
+    await updateJob({
+      status: "WaitingForCustomerApproval",
+      note,
+      remarks: note,
+    });
   }
 
   async function confirmReturn() {
@@ -1207,6 +1229,43 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {showWaitingForm && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 shadow-sm space-y-2">
+            <h3 className="text-sm font-semibold text-amber-900">
+              Waiting for approval
+            </h3>
+            <p className="text-xs text-amber-800">
+              Enter the reason or remarks (estimate, spare needed, customer decision).
+            </p>
+            <textarea
+              value={waitingNote}
+              onChange={(e) => setWaitingNote(e.target.value)}
+              rows={3}
+              placeholder="Reason or remarks"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={confirmWaitingApproval}
+                disabled={saving}
+                className="flex-1 rounded-md bg-amber-600 py-2.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => {
+                  setShowWaitingForm(false);
+                  setWaitingNote("");
+                }}
+                className="flex-1 rounded-md border border-slate-300 bg-white py-2.5 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {showReturnForm && (
           <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 shadow-sm space-y-2">
             <h3 className="text-sm font-semibold text-orange-900">Mark as Return</h3>
@@ -1314,6 +1373,7 @@ export default function JobDetailPage() {
         <CompactCard title="Actions">
           {!showReadyForm &&
             !showVerifyReadyForm &&
+            !showWaitingForm &&
             !showReturnForm &&
             !showOutsourceForm &&
             !showConvertWarrantyForm && (

@@ -364,6 +364,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         data.deliveryContactStatus = "not_contacted";
         data.expectedDeliveryAt = null;
         statusNote = body.note ?? "Verified and marked Ready";
+      } else if (newStatus === "WaitingForCustomerApproval") {
+        const reason =
+          typeof body.note === "string" ? body.note.trim() : "";
+        if (!reason) {
+          return NextResponse.json(
+            { error: "Enter the reason or remarks for waiting approval" },
+            { status: 400 }
+          );
+        }
+        data.status = "WaitingForCustomerApproval";
+        statusChange = "WaitingForCustomerApproval";
+        statusNote = reason;
+        data.remarks = reason;
+        data.outsourcedToId = null;
+        data.outsourcedAt = null;
       } else if (newStatus === "Return") {
         const returnNote =
           typeof body.note === "string" ? body.note.trim() : "";
