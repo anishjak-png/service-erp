@@ -2,7 +2,7 @@
 
 The staff app is a **Capacitor shell** that opens the live site:
 
-**https://uma-service.vercel.app**
+**https://service-erp-tau.vercel.app**
 
 No app store needed — share the APK file directly with reception/technician phones.
 
@@ -45,7 +45,7 @@ Share `app-debug.apk` with staff (WhatsApp, USB, etc.).
 1. Copy `app-debug.apk` to the phone
 2. Open the file → **Install**
 3. Allow **Install unknown apps** if Android asks
-4. Open **Uma Traders** → log in with **mobile number + password** (admin creates accounts)
+4. Open **Service ERP** → log in with **mobile number + password** (admin creates accounts)
 
 ## Device approval
 
@@ -78,9 +78,10 @@ Without these, Add photo fails with a storage configuration error.
 To point at a different server when building:
 
 ```bash
-set CAPACITOR_SERVER_URL=https://your-url.vercel.app
+set CAPACITOR_SERVER_URL=https://service-erp-tau.vercel.app
 npx cap sync android
 ```
+
 
 ## Release APK (optional, for Play Store)
 

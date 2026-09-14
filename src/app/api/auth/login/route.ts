@@ -12,7 +12,6 @@ import {
   upsertStaffDevice,
 } from "@/lib/staff-auth";
 import { getSession } from "@/lib/session";
-import { getTenantBySlugOrName, resolveTenantSlugFromRequest } from "@/lib/tenant";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -21,8 +20,6 @@ export async function POST(request: NextRequest) {
   const deviceId = body.deviceId;
   const deviceLabel = body.deviceLabel;
   const platform = body.platform === "android" ? "android" : "web";
-  const bodyTenantSlug =
-    typeof body.tenantSlug === "string" ? body.tenantSlug.trim() : "";
 
   if (
     !mobileRaw ||
@@ -43,47 +40,11 @@ export async function POST(request: NextRequest) {
   }
 
   const mobile = normalizeMobile(mobileRaw);
-  const tenantSlug =
-    bodyTenantSlug ||
-    resolveTenantSlugFromRequest({
-      host: request.headers.get("host"),
-      searchParams: request.nextUrl.searchParams,
-      headerSlug: request.headers.get("x-tenant-slug"),
-    });
 
-  let staffUser = null;
-
-  if (tenantSlug) {
-    const tenant = await getTenantBySlugOrName(tenantSlug);
-    if (!tenant || tenant.status !== "active") {
-      return NextResponse.json(
-        { error: "Shop not found or suspended" },
-        { status: 404 }
-      );
-    }
-    staffUser = await prisma.staffUser.findUnique({
-      where: {
-        tenantId_mobile: { tenantId: tenant.id, mobile },
-      },
-      include: { technician: true, tenant: true },
-    });
-  } else {
-    const matches = await prisma.staffUser.findMany({
-      where: { mobile, active: true },
-      include: { technician: true, tenant: true },
-      take: 2,
-    });
-    if (matches.length > 1) {
-      return NextResponse.json(
-        {
-          error:
-            "Multiple shops found for this mobile — enter the shop name",
-        },
-        { status: 400 }
-      );
-    }
-    staffUser = matches[0] ?? null;
-  }
+  const staffUser = await prisma.staffUser.findUnique({
+    where: { mobile },
+    include: { technician: true, tenant: true },
+  });
 
   if (!staffUser || !staffUser.active) {
     return NextResponse.json(
@@ -115,8 +76,7 @@ export async function POST(request: NextRequest) {
   }
 
   const approvedCount = await countApprovedDevices(staffUser.tenantId);
-  const autoApprove =
-    staffUser.role === "admin" && approvedCount === 0;
+  const autoApprove = staffUser.role === "admin" && approvedCount === 0;
 
   const device = await upsertStaffDevice({
     tenantId: staffUser.tenantId,

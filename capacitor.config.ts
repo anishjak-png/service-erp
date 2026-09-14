@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 /** Live app URL loaded inside the APK WebView. Override at build: CAPACITOR_SERVER_URL=... */
 const serverUrl =
-  process.env.CAPACITOR_SERVER_URL?.trim() || "https://service-erp.vercel.app";
+  process.env.CAPACITOR_SERVER_URL?.trim() || "https://service-erp-tau.vercel.app";
 
 const config: CapacitorConfig = {
   appId: "com.serviceerp.app",

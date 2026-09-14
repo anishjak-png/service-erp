@@ -130,7 +130,9 @@ export function PlatformDashboard() {
             <h1 className="truncate text-sm font-bold uppercase tracking-wide text-white">
               Service ERP — Platform
             </h1>
-            <p className="text-xs text-emerald-200">Create and control shops</p>
+            <p className="text-xs text-emerald-200">
+              Create companies; each admin logs in with mobile and password
+            </p>
           </div>
           <button
             onClick={logout}
@@ -153,6 +155,10 @@ export function PlatformDashboard() {
           className="space-y-3 rounded-lg border border-slate-200 bg-white p-4"
         >
           <h2 className="text-sm font-semibold text-slate-900">Create shop</h2>
+          <p className="text-xs text-slate-500">
+            Admin mobile must be unique across all companies. That admin then
+            creates staff with their own mobile and password.
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Shop name">
               <input
@@ -255,7 +261,7 @@ export function PlatformDashboard() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <a
-                      href={`/shop-login?tenant=${encodeURIComponent(shop.name)}`}
+                      href="/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"

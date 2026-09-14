@@ -116,4 +116,4 @@ That script:
 
 **Storage:** Product photos use the **service role key** server-side only (`SUPABASE_SERVICE_ROLE_KEY`). Never expose that key or the database password in the browser. Keep `NEXT_PUBLIC_*` vars limited to shop name, phone, app URL.
 
-**Do not** put the Supabase **anon** key in this app for database access — it is not needed for uma-service.
+**Do not** put the Supabase **anon** key in this app for database access — it is not needed.

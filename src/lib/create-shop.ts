@@ -76,9 +76,19 @@ export async function createShop(input: {
   }
 
   const adminMobile = normalizeMobile(input.adminMobile);
+  const mobileTaken = await prisma.staffUser.findUnique({
+    where: { mobile: adminMobile },
+    select: { id: true },
+  });
+  if (mobileTaken) {
+    throw new CreateShopError("This mobile is already used", 409);
+  }
+
   const passwordHash = await hashPassword(adminPin);
 
-  const result = await prisma.$transaction(async (tx) => {
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({
       data: {
         slug,
@@ -115,7 +125,25 @@ export async function createShop(input: {
     });
 
     return { tenant, admin };
-  });
+    });
+  } catch (error) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "";
+    if (code === "P2002") {
+      const target = (error as { meta?: { target?: string[] | string } }).meta
+        ?.target;
+      const fields = Array.isArray(target) ? target : target ? [target] : [];
+      if (fields.includes("mobile")) {
+        throw new CreateShopError("This mobile is already used", 409);
+      }
+      if (fields.includes("slug")) {
+        throw new CreateShopError("That shop name is already taken", 409);
+      }
+    }
+    throw error;
+  }
 
   await seedGenericAppliances(prisma, result.tenant.id);
 

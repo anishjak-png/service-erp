@@ -10,6 +10,7 @@
     "db:push": "node node_modules/prisma/build/index.js db push",
     "db:studio": "node node_modules/prisma/build/index.js studio",
     "db:seed": "npx tsx prisma/seed.ts",
+    "db:seed:ramnath": "npx tsx prisma/seed-ramnath.ts",
     "db:setup": "node node_modules/prisma/build/index.js db push && npx tsx prisma/seed.ts",
     "print-bridge": "npx tsx --env-file=.env scripts/print-bridge/index.ts",
     "print-agent": "npm run print-bridge",

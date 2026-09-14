@@ -70,7 +70,7 @@ export function loadConfig(): BridgeConfig {
     appUrl:
       process.env.NEXT_PUBLIC_APP_URL?.trim() ||
       process.env.PRINT_AGENT_APP_URL?.trim() ||
-      "https://service-erp.vercel.app",
+      "https://service-erp-tau.vercel.app",
     shopName: process.env.NEXT_PUBLIC_SHOP_NAME?.trim() || "Your Shop",
     shopPhone: process.env.NEXT_PUBLIC_SHOP_PHONE?.trim() || "",
   };

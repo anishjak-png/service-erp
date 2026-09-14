@@ -130,7 +130,7 @@ model StaffUser {
   id              String        @id @default(cuid())
   tenantId        String
   tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  mobile          String
+  mobile          String        @unique
   passwordHash    String
   name            String
   role            StaffRole
@@ -142,7 +142,6 @@ model StaffUser {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  @@unique([tenantId, mobile])
   @@index([tenantId])
   @@index([role])
   @@index([technicianId])

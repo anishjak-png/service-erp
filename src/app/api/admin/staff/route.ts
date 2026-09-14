@@ -115,17 +115,19 @@ export async function POST(request: NextRequest) {
 
   const mobile = normalizeMobile(mobileRaw);
   const existing = await prisma.staffUser.findUnique({
-    where: { tenantId_mobile: { tenantId, mobile } },
+    where: { mobile },
   });
   if (existing) {
     return NextResponse.json(
-      { error: "Mobile number already registered" },
+      { error: "This mobile is already used" },
       { status: 409 }
     );
   }
 
   const passwordHash = await hashPassword(password);
-  const staffUser = await prisma.staffUser.create({
+  let staffUser;
+  try {
+    staffUser = await prisma.staffUser.create({
     data: {
       tenantId,
       mobile,
@@ -135,7 +137,20 @@ export async function POST(request: NextRequest) {
       technicianId: role === "technician" ? technicianId : null,
     },
     include: { technician: { select: { id: true, name: true } } },
-  });
+    });
+  } catch (error) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "";
+    if (code === "P2002") {
+      return NextResponse.json(
+        { error: "This mobile is already used" },
+        { status: 409 }
+      );
+    }
+    throw error;
+  }
 
   return NextResponse.json({
     staff: {

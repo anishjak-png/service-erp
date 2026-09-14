@@ -1,12 +1,13 @@
--- Lock down Supabase PostgREST / Data API access for uma-service.
+-- Lock down Supabase PostgREST / Data API for Service ERP.
 --
--- The Next.js app uses Prisma with the postgres connection string (server-side only).
--- It does NOT use the Supabase anon key for database reads/writes.
+-- Next.js uses Prisma with DATABASE_URL (server-side). Staff login is app sessions.
+-- Print Bridge uses the service_role key, which bypasses RLS.
 --
--- Without RLS, anyone with your project URL + anon key could read/write all tables
+-- Without RLS, anyone with the project URL + anon key could read/write all tables
 -- via https://[project].supabase.co/rest/v1/...
 --
 -- Run once in Supabase: SQL Editor → New query → paste → Run
+-- (or: npx tsx scripts/enable-rls.ts)
 
 -- 1. Enable (and force) RLS on every public table
 DO $$

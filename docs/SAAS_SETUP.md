@@ -28,6 +28,14 @@ npm run db:seed
 
 Seed creates tenant slug **`demo`**, technicians Tech A/B/C, and optional admin from `ADMIN_MOBILE` / `ADMIN_PASSWORD`.
 
+Demo company with jobs in every status:
+
+```bash
+npm run db:seed:ramnath
+```
+
+Creates **Ramnath Agencies** (login mobile `9440010001`, password `ramnath123`).
+
 ### B. New Vercel project
 
 1. [vercel.com](https://vercel.com) → **Add New…** → Project → import **`anishjak-png/service-erp`**
@@ -36,21 +44,22 @@ Seed creates tenant slug **`demo`**, technicians Tech A/B/C, and optional admin 
    - Required: `DATABASE_URL`, `DIRECT_URL`, `SESSION_SECRET`
    - Recommended: `ADMIN_MOBILE`, `ADMIN_PASSWORD`, `NEXT_PUBLIC_APP_URL` (after first deploy)
    - Keep `WHATSAPP_ENABLED=false` until Meta is set up for this product
-4. Deploy → open the URL → `/signup` or `/?tenant=demo`
+4. Deploy → open `/platform/login` to create shops, or `/` for staff login (seeded demo admin if `ADMIN_MOBILE` is set)
 
 ### C. Smoke test
 
-- [ ] Login as seeded admin with `/?tenant=demo`
+- [ ] Login as seeded admin with mobile + password (no shop name)
 - [ ] Create a job, open Job Details
-- [ ] Signup a second shop and confirm jobs do not cross tenants
+- [ ] From `/platform`, create a second shop with a **different** admin mobile and confirm jobs do not cross tenants
+- [ ] Shop admin creates staff (mobile + password); that staff only sees their shop and role
 - [ ] (Optional) Print bridge: [PRINT_BRIDGE_TENANT.md](./PRINT_BRIDGE_TENANT.md)
 
 ## Local / preview tenancy
 
-- Signup: `/signup`
-- Login with shop slug: `/?tenant=demo` or subdomain `demo.localhost:3000`
-- Header `x-tenant-slug: demo` also works for API tests
-- Public track: `/track?tenant=demo` (tenant required)
+- Create shops: `/platform` (after `/platform/login`)
+- Public self-serve `/signup` is closed
+- Staff login: `/` — mobile + password (mobile is unique across all shops)
+- Public track: `/track?tenant=demo` (shop name still required for customers)
 
 ## Print bridge (per shop PC)
 

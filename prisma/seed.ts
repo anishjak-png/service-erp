@@ -95,24 +95,32 @@ async function main() {
   if (adminMobile && adminPassword) {
     const mobile = normalizeMobile(adminMobile);
     const passwordHash = await hashPassword(adminPassword);
-    await prisma.staffUser.upsert({
-      where: { tenantId_mobile: { tenantId: tenant.id, mobile } },
-      update: {
-        name: "Admin",
-        role: "admin",
-        active: true,
-        passwordHash,
-      },
-      create: {
-        tenantId: tenant.id,
-        mobile,
-        name: "Admin",
-        role: "admin",
-        active: true,
-        passwordHash,
-      },
-    });
-    console.log("Demo admin seeded for mobile:", mobile, "tenant=demo");
+    const existing = await prisma.staffUser.findUnique({ where: { mobile } });
+    if (existing && existing.tenantId !== tenant.id) {
+      console.warn(
+        "ADMIN_MOBILE already used by another shop — skip demo admin seed"
+      );
+    } else {
+      await prisma.staffUser.upsert({
+        where: { mobile },
+        update: {
+          tenantId: tenant.id,
+          name: "Admin",
+          role: "admin",
+          active: true,
+          passwordHash,
+        },
+        create: {
+          tenantId: tenant.id,
+          mobile,
+          name: "Admin",
+          role: "admin",
+          active: true,
+          passwordHash,
+        },
+      });
+      console.log("Demo admin seeded for mobile:", mobile, "tenant=demo");
+    }
   } else {
     console.warn(
       "ADMIN_MOBILE and ADMIN_PASSWORD not set — skip demo admin staff seed"

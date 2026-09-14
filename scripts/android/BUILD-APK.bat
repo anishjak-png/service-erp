@@ -4,7 +4,8 @@ title Build Service ERP Staff APK
 cd /d "%~dp0..\.."
 
 echo.
-echo  Building debug APK for staff - loads uma-service.vercel.app
+if not defined CAPACITOR_SERVER_URL set "CAPACITOR_SERVER_URL=https://service-erp-tau.vercel.app"
+echo  Building debug APK for staff - loads %CAPACITOR_SERVER_URL%
 echo.
 
 REM --- Auto-detect Java (Android Studio bundles JDK but rarely adds it to PATH) ---

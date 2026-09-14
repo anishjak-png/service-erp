@@ -6,9 +6,9 @@ Multi-tenant SaaS for appliance service job cards (Next.js + Prisma + Supabase +
 
 ## Features
 
-- Multi-tenant shops (signup → own `tenantId` data isolation)
+- Multi-tenant shops (created from `/platform` → own `tenantId` data isolation)
 - Job cards with auto-generated numbers (`SE-…` by default, per-shop prefix configurable)
-- Staff login (mobile + password) with device approval
+- Staff login (mobile + password only) with device approval; each mobile belongs to one shop
 - Search, delivery workflow, technician My Jobs
 - Optional LAN thermal printing (Windows Print Bridge)
 - WhatsApp/Meta optional (`WHATSAPP_ENABLED=false` by default)
@@ -29,8 +29,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-- Signup: `/signup`
-- Demo tenant (after seed): `/?tenant=demo`
+- Staff login: `/` (mobile + password)
+- Platform (create companies): `/platform/login`
+- Demo tenant (after seed): log in with `ADMIN_MOBILE` / `ADMIN_PASSWORD`
 - Full checklist: **[docs/SAAS_SETUP.md](docs/SAAS_SETUP.md)**
 
 ### Seed admin

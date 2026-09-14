@@ -46,11 +46,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     const mobile = normalizeMobile(body.mobile);
     const conflict = await prisma.staffUser.findFirst({
-      where: { ...tenantFilter, mobile, NOT: { id } },
+      where: { mobile, NOT: { id } },
     });
     if (conflict) {
       return NextResponse.json(
-        { error: "Mobile number already in use" },
+        { error: "This mobile is already used" },
         { status: 409 }
       );
     }
@@ -123,7 +123,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     where: { id },
     data,
     include: { technician: { select: { id: true, name: true } } },
+  }).catch((error: unknown) => {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "";
+    if (code === "P2002") {
+      return null;
+    }
+    throw error;
   });
+  if (!updated) {
+    return NextResponse.json(
+      { error: "This mobile is already used" },
+      { status: 409 }
+    );
+  }
 
   return NextResponse.json({
     staff: {
