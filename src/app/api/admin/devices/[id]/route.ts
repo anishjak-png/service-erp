@@ -55,10 +55,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     },
   });
 
-  if (
-    action === "approve" &&
-    updated.staffUser.role !== "admin"
-  ) {
+  if (action === "approve" && updated.staffUser.role !== "admin") {
     await revokeOtherApprovedDevices(updated.staffUserId, updated.deviceId);
   }
 

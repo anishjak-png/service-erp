@@ -19,7 +19,7 @@ export async function countPendingDevices(tenantId?: string): Promise<number> {
   });
 }
 
-/** Non-admin users may only have one approved device at a time. */
+/** Non-admin staff may have only one approved device at a time. Admins may keep several. */
 export async function revokeOtherApprovedDevices(
   staffUserId: string,
   exceptDeviceId: string

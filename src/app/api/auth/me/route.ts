@@ -2,7 +2,12 @@ import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { countPendingDevices } from "@/lib/staff-auth";
 import { countUnreadAlerts } from "@/lib/staff-alerts";
-import { clearSession, getSession, isDeviceApproved } from "@/lib/session";
+import {
+  clearSession,
+  getSession,
+  isDeviceApproved,
+  touchSession,
+} from "@/lib/session";
 
 export async function GET() {
   const session = await getSession();
@@ -37,18 +42,24 @@ export async function GET() {
     const role = session.role;
 
     if (tenantId) {
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: { status: true },
-      });
-      if (!tenant || tenant.status !== "active") {
-        await clearSession(session);
-        return NextResponse.json({
-          isLoggedIn: false,
-          error: "shop_locked",
+      try {
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { status: true },
         });
+        if (tenant && tenant.status !== "active") {
+          await clearSession(session);
+          return NextResponse.json({
+            isLoggedIn: false,
+            error: "shop_locked",
+          });
+        }
+      } catch {
+        /* keep session if shop status cannot be checked */
       }
     }
+
+    await touchSession(session);
 
     after(async () => {
       try {
@@ -149,5 +160,6 @@ export async function GET() {
     );
   }
 
+  await touchSession(session);
   return NextResponse.json(payload);
 }

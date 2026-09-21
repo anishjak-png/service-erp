@@ -93,6 +93,11 @@ export function DevicesTab() {
     <div className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold text-slate-800">Device approval</h2>
+        <p className="text-xs text-slate-500">
+          Reception, technician, and verifier can have only one active device.
+          Approving a new phone turns off the old one. Admin can keep several
+          devices.
+        </p>
         {pendingCount > 0 && filter !== "pending" && (
           <p className="text-sm text-amber-700">{pendingCount} device(s) waiting</p>
         )}

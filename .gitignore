@@ -52,6 +52,7 @@ resources/staff*.yaml
 
 *.apk
 *.aab
+!public/service-erp.apk
 android/.gradle/
 android/app/build/
 android/build/

@@ -114,7 +114,7 @@ async function handleLogin(request: NextRequest) {
     approvedById: autoApprove ? staffUser.id : undefined,
   });
 
-  if (staffUser.role !== "admin" && device.status !== "revoked") {
+  if (staffUser.role !== "admin" && device.status === "approved") {
     await revokeOtherApprovedDevices(staffUser.id, device.deviceId);
   }
 

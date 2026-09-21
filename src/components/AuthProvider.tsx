@@ -49,7 +49,9 @@ const emptyAuth: AuthState = {
 function readAuthCache(): AuthState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
+    const raw =
+      localStorage.getItem(AUTH_STORAGE_KEY) ??
+      sessionStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AuthState;
     if (!parsed.isLoggedIn || !parsed.role) return null;
@@ -62,10 +64,11 @@ function readAuthCache(): AuthState | null {
 function writeAuthCache(state: AuthState) {
   if (typeof window === "undefined") return;
   try {
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
     if (state.isLoggedIn && state.role) {
-      sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state));
     } else {
-      sessionStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(AUTH_STORAGE_KEY);
     }
   } catch {
     /* ignore */

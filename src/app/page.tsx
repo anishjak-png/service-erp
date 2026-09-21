@@ -19,6 +19,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [nativeApp, setNativeApp] = useState(false);
+
+  useEffect(() => {
+    void import("@capacitor/core").then(({ Capacitor }) => {
+      setNativeApp(Capacitor.isNativePlatform());
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!loaded) return;
@@ -158,6 +165,14 @@ export default function LoginPage() {
           <p className="mt-4 text-center text-xs text-slate-400">
             New device? Admin must approve after first login.
           </p>
+          {!nativeApp && (
+            <a
+              href="/service-erp.apk"
+              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+            >
+              Download Android app
+            </a>
+          )}
           <p className="mt-3 text-center text-sm">
             <a href="/track" className="font-medium text-emerald-700 hover:underline">
               Customer? Track your job status
