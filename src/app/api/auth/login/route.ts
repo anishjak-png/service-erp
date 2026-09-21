@@ -82,7 +82,7 @@ async function handleLogin(request: NextRequest) {
 
   if (staffUser.tenant.status !== "active") {
     return NextResponse.json(
-      { error: "Shop is suspended" },
+      { error: "This shop is locked" },
       { status: 403 }
     );
   }

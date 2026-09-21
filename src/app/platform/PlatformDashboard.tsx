@@ -10,6 +10,7 @@ type ShopRow = {
   phone: string;
   jobPrefix: string;
   status: string;
+  tariffNotes: string;
   createdAt: string;
   jobCount: number;
   staffCount: number;
@@ -33,6 +34,8 @@ export function PlatformDashboard() {
   const [adminMobile, setAdminMobile] = useState("");
   const [adminPin, setAdminPin] = useState("");
   const [jobPrefix, setJobPrefix] = useState("");
+  const [tariffNotes, setTariffNotes] = useState("");
+  const [tariffDrafts, setTariffDrafts] = useState<Record<string, string>>({});
 
   async function loadShops() {
     const res = await fetch("/api/platform/shops");
@@ -71,6 +74,7 @@ export function PlatformDashboard() {
           adminMobile,
           adminPin,
           jobPrefix: jobPrefix.trim() || undefined,
+          tariffNotes,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -84,6 +88,7 @@ export function PlatformDashboard() {
       setAdminMobile("");
       setAdminPin("");
       setJobPrefix("");
+      setTariffNotes("");
       setSaved(`Created ${data.tenant?.name ?? "shop"}.`);
       await loadShops();
     } catch {
@@ -108,6 +113,31 @@ export function PlatformDashboard() {
         setError(data.error ?? "Could not update shop");
         return;
       }
+      await loadShops();
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function saveTariff(id: string) {
+    const notes = (tariffDrafts[id] ?? shops.find((s) => s.id === id)?.tariffNotes ?? "").trim();
+    setUpdatingId(id);
+    setError("");
+    setSaved("");
+    try {
+      const res = await fetch(`/api/platform/shops/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tariffNotes: notes }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Could not save tariff");
+        return;
+      }
+      setSaved("Tariff saved.");
       await loadShops();
     } catch {
       setError("Could not reach the server.");
@@ -147,7 +177,7 @@ export function PlatformDashboard() {
         <div className="grid grid-cols-3 gap-2">
           <Stat label="Shops" value={totals.all} />
           <Stat label="Active" value={totals.active} />
-          <Stat label="Suspended" value={totals.suspended} />
+          <Stat label="Locked" value={totals.suspended} />
         </div>
 
         <form
@@ -215,6 +245,17 @@ export function PlatformDashboard() {
                 className={inputClass}
               />
             </Field>
+          <div className="sm:col-span-2">
+            <Field label="Tariff notes (optional)">
+              <textarea
+                value={tariffNotes}
+                onChange={(e) => setTariffNotes(e.target.value)}
+                placeholder="e.g. Rs 1,500 / month · 50 jobs included"
+                rows={2}
+                className={`${inputClass} h-auto py-2`}
+              />
+            </Field>
+          </div>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           {saved && <p className="text-sm text-emerald-700">{saved}</p>}
@@ -256,9 +297,24 @@ export function PlatformDashboard() {
                           : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {shop.status}
+                      {shop.status === "active" ? "Active" : "Locked"}
                     </span>
                   </div>
+                  <label className="block text-xs font-medium text-slate-600">
+                    Tariff (internal)
+                    <textarea
+                      value={tariffDrafts[shop.id] ?? shop.tariffNotes ?? ""}
+                      onChange={(e) =>
+                        setTariffDrafts((prev) => ({
+                          ...prev,
+                          [shop.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. Rs 1,500 / month"
+                      rows={2}
+                      className={`${inputClass} mt-1 h-auto py-2`}
+                    />
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     <a
                       href="/"
@@ -268,6 +324,14 @@ export function PlatformDashboard() {
                     >
                       Open login
                     </a>
+                    <button
+                      type="button"
+                      disabled={updatingId === shop.id}
+                      onClick={() => saveTariff(shop.id)}
+                      className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Save tariff
+                    </button>
                     {shop.status === "active" ? (
                       <button
                         type="button"
@@ -275,7 +339,7 @@ export function PlatformDashboard() {
                         onClick={() => setStatus(shop.id, "suspended")}
                         className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
                       >
-                        Suspend
+                        Lock shop
                       </button>
                     ) : (
                       <button
@@ -284,7 +348,7 @@ export function PlatformDashboard() {
                         onClick={() => setStatus(shop.id, "active")}
                         className="rounded-md border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
                       >
-                        Activate
+                        Unlock
                       </button>
                     )}
                   </div>

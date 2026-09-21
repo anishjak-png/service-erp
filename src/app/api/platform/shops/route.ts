@@ -16,6 +16,7 @@ export async function GET() {
       phone: true,
       jobPrefix: true,
       status: true,
+      tariffNotes: true,
       createdAt: true,
       _count: {
         select: { jobCards: true, staffUsers: true },
@@ -31,6 +32,7 @@ export async function GET() {
       phone: shop.phone,
       jobPrefix: shop.jobPrefix,
       status: shop.status,
+      tariffNotes: shop.tariffNotes,
       createdAt: shop.createdAt,
       jobCount: shop._count.jobCards,
       staffCount: shop._count.staffUsers,
@@ -62,6 +64,8 @@ export async function POST(request: NextRequest) {
             : "",
       jobPrefix: typeof body.jobPrefix === "string" ? body.jobPrefix : undefined,
       phone: typeof body.phone === "string" ? body.phone : undefined,
+      tariffNotes:
+        typeof body.tariffNotes === "string" ? body.tariffNotes : undefined,
     });
     return NextResponse.json(created, { status: 201 });
   } catch (err) {

@@ -11,11 +11,19 @@ export async function PATCH(
 
   const { id } = await context.params;
   const body = await request.json().catch(() => ({}));
-  const status = typeof body.status === "string" ? body.status.trim() : "";
+  const status =
+    typeof body.status === "string" ? body.status.trim() : undefined;
+  const hasTariffNotes = typeof body.tariffNotes === "string";
 
-  if (status !== "active" && status !== "suspended") {
+  if (status && status !== "active" && status !== "suspended") {
     return NextResponse.json(
-      { error: "Status must be active or suspended" },
+      { error: "Status must be active or locked" },
+      { status: 400 }
+    );
+  }
+  if (!status && !hasTariffNotes) {
+    return NextResponse.json(
+      { error: "Nothing to update" },
       { status: 400 }
     );
   }
@@ -27,12 +35,16 @@ export async function PATCH(
 
   const updated = await prisma.tenant.update({
     where: { id },
-    data: { status },
+    data: {
+      ...(status ? { status } : {}),
+      ...(hasTariffNotes ? { tariffNotes: body.tariffNotes.trim() } : {}),
+    },
     select: {
       id: true,
       name: true,
       slug: true,
       status: true,
+      tariffNotes: true,
     },
   });
 

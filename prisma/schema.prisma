@@ -17,7 +17,8 @@ model Tenant {
   jobPrefix       String  @default("SE")
   tokenPrefix     String  @default("TK")
   tokenResetDaily Boolean @default(false)
-  status          String  @default("active") // active|suspended
+  status          String  @default("active") // active|suspended (locked)
+  tariffNotes     String  @default("")
   createdAt DateTime @default(now())
 
   customers             Customer[]

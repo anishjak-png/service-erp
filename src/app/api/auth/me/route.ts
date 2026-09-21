@@ -36,6 +36,20 @@ export async function GET() {
     const deviceId = session.deviceId;
     const role = session.role;
 
+    if (tenantId) {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { status: true },
+      });
+      if (!tenant || tenant.status !== "active") {
+        await clearSession(session);
+        return NextResponse.json({
+          isLoggedIn: false,
+          error: "shop_locked",
+        });
+      }
+    }
+
     after(async () => {
       try {
         if (deviceId && tenantId) {
@@ -61,12 +75,23 @@ export async function GET() {
 
   const staffUser = await prisma.staffUser.findUnique({
     where: { id: session.staffUserId },
-    include: { technician: true, tenant: { select: { name: true } } },
+    include: {
+      technician: true,
+      tenant: { select: { name: true, status: true } },
+    },
   });
 
   if (!staffUser || !staffUser.active) {
     await clearSession(session);
     return NextResponse.json({ isLoggedIn: false });
+  }
+
+  if (!staffUser.tenant || staffUser.tenant.status !== "active") {
+    await clearSession(session);
+    return NextResponse.json({
+      isLoggedIn: false,
+      error: "shop_locked",
+    });
   }
 
   if (session.tenantId && staffUser.tenantId !== session.tenantId) {

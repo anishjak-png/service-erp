@@ -34,11 +34,13 @@ export async function createShop(input: {
   adminPin: string;
   jobPrefix?: string;
   phone?: string;
+  tariffNotes?: string;
 }) {
   const shopName = input.shopName.trim();
   const adminName = input.adminName.trim();
   const adminPin = input.adminPin;
   const phone = input.phone?.trim() ?? "";
+  const tariffNotes = input.tariffNotes?.trim() ?? "";
 
   if (!shopName) {
     throw new CreateShopError("Shop name is required");
@@ -98,6 +100,7 @@ export async function createShop(input: {
         tokenPrefix: "TK",
         tokenResetDaily: false,
         status: "active",
+        tariffNotes,
       },
     });
 
@@ -155,6 +158,7 @@ export async function createShop(input: {
       phone: result.tenant.phone,
       jobPrefix: result.tenant.jobPrefix,
       status: result.tenant.status,
+      tariffNotes: result.tenant.tariffNotes,
       createdAt: result.tenant.createdAt,
     },
     admin: {
