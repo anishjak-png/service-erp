@@ -80,6 +80,7 @@ export function PlatformDashboard() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Could not create shop");
+        await loadShops();
         return;
       }
       setShopName("");

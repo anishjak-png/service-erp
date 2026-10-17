@@ -27,6 +27,41 @@ function jobPrefixFromName(name: string): string {
   return slugify(name).replace(/-/g, "").slice(0, 4).toUpperCase() || "SE";
 }
 
+function mapShopDbError(error: unknown): CreateShopError {
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "";
+  const message = error instanceof Error ? error.message : "";
+  const target = (
+    error as { meta?: { target?: string[] | string } } | undefined
+  )?.meta?.target;
+  const fields = Array.isArray(target) ? target : target ? [target] : [];
+
+  if (code === "P2002") {
+    if (fields.includes("mobile")) {
+      return new CreateShopError("This mobile is already used", 409);
+    }
+    if (fields.includes("slug")) {
+      return new CreateShopError("That shop name is already taken", 409);
+    }
+    return new CreateShopError("That shop already exists", 409);
+  }
+  if (code === "P2022" || /tariffNotes/i.test(message)) {
+    return new CreateShopError(
+      "Database is missing a shop field. Update the schema and try again.",
+      500
+    );
+  }
+  if (code === "P2028" || /transaction/i.test(message)) {
+    return new CreateShopError("Database timed out. Try again.", 503);
+  }
+  if (code === "P1001" || /Can't reach database/i.test(message)) {
+    return new CreateShopError("Database unavailable. Try again.", 503);
+  }
+  return new CreateShopError("Could not create shop", 500);
+}
+
 export async function createShop(input: {
   shopName: string;
   adminName: string;
@@ -88,23 +123,47 @@ export async function createShop(input: {
 
   const passwordHash = await hashPassword(adminPin);
 
-  let result;
-  try {
-    result = await prisma.$transaction(async (tx) => {
-    const tenant = await tx.tenant.create({
-      data: {
-        slug,
-        name: shopName,
-        phone,
-        jobPrefix,
-        tokenPrefix: "TK",
-        tokenResetDaily: false,
-        status: "active",
-        tariffNotes,
-      },
-    });
+  const tenantData = {
+    slug,
+    name: shopName,
+    phone,
+    jobPrefix,
+    tokenPrefix: "TK",
+    tokenResetDaily: false,
+    status: "active",
+  };
 
-    const admin = await tx.staffUser.create({
+  let tenant;
+  try {
+    tenant = await prisma.tenant.create({
+      data: { ...tenantData, tariffNotes },
+    });
+  } catch (first) {
+    const msg = first instanceof Error ? first.message : "";
+    const code =
+      first && typeof first === "object" && "code" in first
+        ? String((first as { code: unknown }).code)
+        : "";
+    if (code === "P2022" || /tariffNotes/i.test(msg)) {
+      try {
+        tenant = await prisma.tenant.create({ data: tenantData });
+      } catch (error) {
+        console.error("[createShop] tenant.create", error);
+        throw mapShopDbError(error);
+      }
+    } else {
+      console.error("[createShop] tenant.create", first);
+      throw mapShopDbError(first);
+    }
+  }
+
+  if (!tenant) {
+    throw new CreateShopError("Could not create shop", 500);
+  }
+
+  let admin;
+  try {
+    admin = await prisma.staffUser.create({
       data: {
         tenantId: tenant.id,
         mobile: adminMobile,
@@ -115,56 +174,44 @@ export async function createShop(input: {
       },
     });
 
-    await tx.jobSequence.create({
+    await prisma.jobSequence.create({
       data: { tenantId: tenant.id, lastNum: 0 },
     });
 
-    await tx.tokenSequence.create({
+    await prisma.tokenSequence.create({
       data: { tenantId: tenant.id, lastNum: 0 },
     });
 
-    await tx.notificationSettings.create({
+    await prisma.notificationSettings.create({
       data: { tenantId: tenant.id },
     });
-
-    return { tenant, admin };
-    });
   } catch (error) {
-    const code =
-      error && typeof error === "object" && "code" in error
-        ? String((error as { code: unknown }).code)
-        : "";
-    if (code === "P2002") {
-      const target = (error as { meta?: { target?: string[] | string } }).meta
-        ?.target;
-      const fields = Array.isArray(target) ? target : target ? [target] : [];
-      if (fields.includes("mobile")) {
-        throw new CreateShopError("This mobile is already used", 409);
-      }
-      if (fields.includes("slug")) {
-        throw new CreateShopError("That shop name is already taken", 409);
-      }
-    }
-    throw error;
+    console.error("[createShop] shop records", error);
+    await prisma.tenant.delete({ where: { id: tenant.id } }).catch(() => {});
+    throw mapShopDbError(error);
   }
 
-  await seedGenericAppliances(prisma, result.tenant.id);
+  try {
+    await seedGenericAppliances(prisma, tenant.id);
+  } catch (error) {
+    console.error("[createShop] catalog seed failed", error);
+  }
 
   return {
     tenant: {
-      id: result.tenant.id,
-      slug: result.tenant.slug,
-      name: result.tenant.name,
-      phone: result.tenant.phone,
-      jobPrefix: result.tenant.jobPrefix,
-      status: result.tenant.status,
-      tariffNotes: result.tenant.tariffNotes,
-      createdAt: result.tenant.createdAt,
+      id: tenant.id,
+      slug: tenant.slug,
+      name: tenant.name,
+      phone: tenant.phone,
+      jobPrefix: tenant.jobPrefix,
+      status: tenant.status,
+      tariffNotes: tenant.tariffNotes,
+      createdAt: tenant.createdAt,
     },
     admin: {
-      id: result.admin.id,
-      name: result.admin.name,
-      mobile: result.admin.mobile,
+      id: admin.id,
+      name: admin.name,
+      mobile: admin.mobile,
     },
   };
 }
