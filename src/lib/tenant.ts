@@ -18,6 +18,21 @@ export type TenantRecord = {
 
 export { isValidTenantSlug, resolveTenantSlugFromRequest, slugFromHost, slugify };
 
+/** No expiry set means the shop is not limited. */
+export function isLicenseExpired(expiresAt: Date | string | null | undefined): boolean {
+  if (!expiresAt) return false;
+  const ms = expiresAt instanceof Date ? expiresAt.getTime() : new Date(expiresAt).getTime();
+  return Number.isFinite(ms) && ms < Date.now();
+}
+
+export function parseLicenseDate(value: string): Date | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const parsed = new Date(`${raw}T23:59:59.999+05:30`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 const tenantSelect = {
   id: true,
   slug: true,

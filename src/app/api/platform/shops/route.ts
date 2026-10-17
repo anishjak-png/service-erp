@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requirePlatformAdmin } from "@/lib/platform-auth";
 import { CreateShopError, createShop } from "@/lib/create-shop";
+import { parseLicenseDate } from "@/lib/tenant";
 
 export async function GET() {
   const { error } = await requirePlatformAdmin();
@@ -17,7 +18,15 @@ export async function GET() {
       jobPrefix: true,
       status: true,
       tariffNotes: true,
+      adminPasswordNote: true,
+      licenseExpiresAt: true,
       createdAt: true,
+      staffUsers: {
+        where: { role: "admin" },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+        select: { name: true, mobile: true },
+      },
       _count: {
         select: { jobCards: true, staffUsers: true },
       },
@@ -33,6 +42,10 @@ export async function GET() {
       jobPrefix: shop.jobPrefix,
       status: shop.status,
       tariffNotes: shop.tariffNotes,
+      adminName: shop.staffUsers[0]?.name ?? "",
+      adminMobile: shop.staffUsers[0]?.mobile ?? "",
+      adminPassword: shop.adminPasswordNote,
+      licenseExpiresAt: shop.licenseExpiresAt,
       createdAt: shop.createdAt,
       jobCount: shop._count.jobCards,
       staffCount: shop._count.staffUsers,
@@ -66,6 +79,10 @@ export async function POST(request: NextRequest) {
       phone: typeof body.phone === "string" ? body.phone : undefined,
       tariffNotes:
         typeof body.tariffNotes === "string" ? body.tariffNotes : undefined,
+      licenseExpiresAt:
+        typeof body.licenseExpiresAt === "string"
+          ? parseLicenseDate(body.licenseExpiresAt)
+          : undefined,
     });
     return NextResponse.json(created, { status: 201 });
   } catch (err) {

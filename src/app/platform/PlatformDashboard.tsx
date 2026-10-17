@@ -11,6 +11,10 @@ type ShopRow = {
   jobPrefix: string;
   status: string;
   tariffNotes: string;
+  adminName: string;
+  adminMobile: string;
+  adminPassword: string;
+  licenseExpiresAt: string | null;
   createdAt: string;
   jobCount: number;
   staffCount: number;
@@ -18,10 +22,44 @@ type ShopRow = {
 
 type Totals = { all: number; active: number; suspended: number };
 
+function addMonthsYmd(months: number): string {
+  const parts = new Date()
+    .toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
+    .split("-")
+    .map(Number);
+  const [y, m, d] = parts;
+  const dt = new Date(Date.UTC(y, m - 1 + months, d));
+  return dt.toISOString().slice(0, 10);
+}
+
+function toDateInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+}
+
+function formatLicense(iso: string | null | undefined): string {
+  if (!iso) return "Not set";
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
+}
+
+function isExpired(iso: string | null | undefined): boolean {
+  if (!iso) return false;
+  return new Date(iso).getTime() < Date.now();
+}
+
 export function PlatformDashboard() {
   const router = useRouter();
   const [shops, setShops] = useState<ShopRow[]>([]);
-  const [totals, setTotals] = useState<Totals>({ all: 0, active: 0, suspended: 0 });
+  const [totals, setTotals] = useState<Totals>({
+    all: 0,
+    active: 0,
+    suspended: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
@@ -35,7 +73,10 @@ export function PlatformDashboard() {
   const [adminPin, setAdminPin] = useState("");
   const [jobPrefix, setJobPrefix] = useState("");
   const [tariffNotes, setTariffNotes] = useState("");
+  const [licenseExpiresAt, setLicenseExpiresAt] = useState("");
   const [tariffDrafts, setTariffDrafts] = useState<Record<string, string>>({});
+  const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
+  const [licenseDrafts, setLicenseDrafts] = useState<Record<string, string>>({});
 
   async function loadShops() {
     const res = await fetch("/api/platform/shops");
@@ -75,6 +116,7 @@ export function PlatformDashboard() {
           adminPin,
           jobPrefix: jobPrefix.trim() || undefined,
           tariffNotes,
+          licenseExpiresAt: licenseExpiresAt || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -90,6 +132,7 @@ export function PlatformDashboard() {
       setAdminPin("");
       setJobPrefix("");
       setTariffNotes("");
+      setLicenseExpiresAt("");
       setSaved(`Created ${data.tenant?.name ?? "shop"}.`);
       await loadShops();
     } catch {
@@ -99,7 +142,7 @@ export function PlatformDashboard() {
     }
   }
 
-  async function setStatus(id: string, status: "active" | "suspended") {
+  async function patchShop(id: string, body: Record<string, unknown>, okMessage: string) {
     setUpdatingId(id);
     setError("");
     setSaved("");
@@ -107,13 +150,14 @@ export function PlatformDashboard() {
       const res = await fetch(`/api/platform/shops/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Could not update shop");
         return;
       }
+      setSaved(okMessage);
       await loadShops();
     } catch {
       setError("Could not reach the server.");
@@ -122,29 +166,24 @@ export function PlatformDashboard() {
     }
   }
 
-  async function saveTariff(id: string) {
-    const notes = (tariffDrafts[id] ?? shops.find((s) => s.id === id)?.tariffNotes ?? "").trim();
-    setUpdatingId(id);
-    setError("");
-    setSaved("");
-    try {
-      const res = await fetch(`/api/platform/shops/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tariffNotes: notes }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "Could not save tariff");
-        return;
-      }
-      setSaved("Tariff saved.");
-      await loadShops();
-    } catch {
-      setError("Could not reach the server.");
-    } finally {
-      setUpdatingId(null);
-    }
+  async function setStatus(id: string, status: "active" | "suspended") {
+    await patchShop(id, { status }, status === "active" ? "Shop unlocked." : "Shop locked.");
+  }
+
+  async function saveShopDetails(id: string) {
+    const shop = shops.find((s) => s.id === id);
+    const notes = (tariffDrafts[id] ?? shop?.tariffNotes ?? "").trim();
+    const password = (passwordDrafts[id] ?? shop?.adminPassword ?? "").trim();
+    const license = licenseDrafts[id] ?? toDateInput(shop?.licenseExpiresAt);
+    await patchShop(
+      id,
+      {
+        tariffNotes: notes,
+        adminPassword: password || undefined,
+        licenseExpiresAt: license || null,
+      },
+      "Shop details saved."
+    );
   }
 
   async function logout() {
@@ -175,10 +214,10 @@ export function PlatformDashboard() {
       </header>
 
       <main className="mx-auto max-w-3xl space-y-4 p-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label="Shops" value={totals.all} />
-          <Stat label="Active" value={totals.active} />
-          <Stat label="Locked" value={totals.suspended} />
+          <Stat label="LIVE" value={totals.active} />
+          <Stat label="LOCKED" value={totals.suspended} />
         </div>
 
         <form
@@ -215,7 +254,7 @@ export function PlatformDashboard() {
                 required
               />
             </Field>
-            <Field label="Admin mobile">
+            <Field label="Admin mobile (username)">
               <input
                 value={adminMobile}
                 onChange={(e) =>
@@ -228,7 +267,7 @@ export function PlatformDashboard() {
             </Field>
             <Field label="Admin password / PIN">
               <input
-                type="password"
+                type="text"
                 value={adminPin}
                 onChange={(e) => setAdminPin(e.target.value)}
                 minLength={4}
@@ -246,17 +285,43 @@ export function PlatformDashboard() {
                 className={inputClass}
               />
             </Field>
-          <div className="sm:col-span-2">
-            <Field label="Tariff notes (optional)">
-              <textarea
-                value={tariffNotes}
-                onChange={(e) => setTariffNotes(e.target.value)}
-                placeholder="e.g. Rs 1,500 / month · 50 jobs included"
-                rows={2}
-                className={`${inputClass} h-auto py-2`}
-              />
-            </Field>
-          </div>
+            <div className="sm:col-span-2">
+              <Field label="License expiry">
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    type="date"
+                    value={licenseExpiresAt}
+                    onChange={(e) => setLicenseExpiresAt(e.target.value)}
+                    className={`${inputClass} sm:max-w-[12rem]`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLicenseExpiresAt(addMonthsYmd(6))}
+                    className="rounded-md border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    6 months
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLicenseExpiresAt(addMonthsYmd(12))}
+                    className="rounded-md border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    1 year
+                  </button>
+                </div>
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Field label="Tariff notes (optional)">
+                <textarea
+                  value={tariffNotes}
+                  onChange={(e) => setTariffNotes(e.target.value)}
+                  placeholder="e.g. Rs 1,500 / month · 50 jobs included"
+                  rows={2}
+                  className={`${inputClass} h-auto py-2`}
+                />
+              </Field>
+            </div>
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           {saved && <p className="text-sm text-emerald-700">{saved}</p>}
@@ -279,7 +344,9 @@ export function PlatformDashboard() {
             <p className="p-4 text-sm text-slate-500">No shops yet.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {shops.map((shop) => (
+              {shops.map((shop) => {
+                const expired = isExpired(shop.licenseExpiresAt);
+                return (
                 <li key={shop.id} className="space-y-2 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -291,15 +358,98 @@ export function PlatformDashboard() {
                         {shop.phone ? ` · ${shop.phone}` : ""}
                       </p>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                        shop.status === "active"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {shop.status === "active" ? "Active" : "Locked"}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          shop.status === "active"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {shop.status === "active" ? "LIVE" : "LOCKED"}
+                    </div>
+                  </div>
+                  <div className="grid gap-2 rounded-md bg-slate-50 p-3 text-xs sm:grid-cols-2">
+                    <p>
+                      <span className="font-medium text-slate-500">Admin username</span>
+                      <br />
+                      <span className="font-mono text-sm text-slate-900">
+                        {shop.adminMobile || "—"}
+                      </span>
+                      {shop.adminName ? (
+                        <span className="text-slate-500"> · {shop.adminName}</span>
+                      ) : null}
+                    </p>
+                    <label className="block font-medium text-slate-500">
+                      Admin password
+                      <input
+                        type="text"
+                        value={passwordDrafts[shop.id] ?? shop.adminPassword ?? ""}
+                        onChange={(e) =>
+                          setPasswordDrafts((prev) => ({
+                            ...prev,
+                            [shop.id]: e.target.value,
+                          }))
+                        }
+                        className={`${inputClass} mt-1 h-9 font-mono`}
+                      />
+                    </label>
+                    <div className="sm:col-span-2">
+                      <p className="font-medium text-slate-500">
+                        License expiry{" "}
+                        <span className="text-slate-900">
+                          {formatLicense(shop.licenseExpiresAt)}
+                          {expired ? " (past)" : ""}
+                        </span>
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <input
+                          type="date"
+                          value={
+                            licenseDrafts[shop.id] ?? toDateInput(shop.licenseExpiresAt)
+                          }
+                          onChange={(e) =>
+                            setLicenseDrafts((prev) => ({
+                              ...prev,
+                              [shop.id]: e.target.value,
+                            }))
+                          }
+                          className={`${inputClass} h-9 sm:max-w-[12rem]`}
+                        />
+                        <button
+                          type="button"
+                          disabled={updatingId === shop.id}
+                          onClick={() => {
+                            const next = addMonthsYmd(6);
+                            setLicenseDrafts((prev) => ({ ...prev, [shop.id]: next }));
+                            void patchShop(
+                              shop.id,
+                              { licenseExpiresAt: next },
+                              "License set to 6 months."
+                            );
+                          }}
+                          className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          6 months
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updatingId === shop.id}
+                          onClick={() => {
+                            const next = addMonthsYmd(12);
+                            setLicenseDrafts((prev) => ({ ...prev, [shop.id]: next }));
+                            void patchShop(
+                              shop.id,
+                              { licenseExpiresAt: next },
+                              "License set to 1 year."
+                            );
+                          }}
+                          className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          1 year
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <label className="block text-xs font-medium text-slate-600">
                     Tariff (internal)
@@ -328,10 +478,10 @@ export function PlatformDashboard() {
                     <button
                       type="button"
                       disabled={updatingId === shop.id}
-                      onClick={() => saveTariff(shop.id)}
+                      onClick={() => saveShopDetails(shop.id)}
                       className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
-                      Save tariff
+                      Save details
                     </button>
                     {shop.status === "active" ? (
                       <button
@@ -354,7 +504,8 @@ export function PlatformDashboard() {
                     )}
                   </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
           )}
         </section>

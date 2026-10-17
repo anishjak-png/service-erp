@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { hashPassword } from "@/lib/password";
 import { requirePlatformAdmin } from "@/lib/platform-auth";
+import { parseLicenseDate } from "@/lib/tenant";
 
 export async function PATCH(
   request: NextRequest,
@@ -14,6 +16,9 @@ export async function PATCH(
   const status =
     typeof body.status === "string" ? body.status.trim() : undefined;
   const hasTariffNotes = typeof body.tariffNotes === "string";
+  const hasPassword =
+    typeof body.adminPassword === "string" && body.adminPassword.trim().length > 0;
+  const hasLicense = "licenseExpiresAt" in body;
 
   if (status && status !== "active" && status !== "suspended") {
     return NextResponse.json(
@@ -21,7 +26,29 @@ export async function PATCH(
       { status: 400 }
     );
   }
-  if (!status && !hasTariffNotes) {
+
+  let licenseExpiresAt: Date | null | undefined;
+  if (hasLicense) {
+    if (body.licenseExpiresAt === null || body.licenseExpiresAt === "") {
+      licenseExpiresAt = null;
+    } else if (typeof body.licenseExpiresAt === "string") {
+      const parsed = parseLicenseDate(body.licenseExpiresAt);
+      if (!parsed) {
+        return NextResponse.json(
+          { error: "License date must be YYYY-MM-DD" },
+          { status: 400 }
+        );
+      }
+      licenseExpiresAt = parsed;
+    } else {
+      return NextResponse.json(
+        { error: "License date must be YYYY-MM-DD" },
+        { status: 400 }
+      );
+    }
+  }
+
+  if (!status && !hasTariffNotes && !hasPassword && !hasLicense) {
     return NextResponse.json(
       { error: "Nothing to update" },
       { status: 400 }
@@ -38,6 +65,8 @@ export async function PATCH(
     data: {
       ...(status ? { status } : {}),
       ...(hasTariffNotes ? { tariffNotes: body.tariffNotes.trim() } : {}),
+      ...(hasPassword ? { adminPasswordNote: body.adminPassword.trim() } : {}),
+      ...(hasLicense ? { licenseExpiresAt } : {}),
     },
     select: {
       id: true,
@@ -45,8 +74,24 @@ export async function PATCH(
       slug: true,
       status: true,
       tariffNotes: true,
+      adminPasswordNote: true,
+      licenseExpiresAt: true,
     },
   });
+
+  if (hasPassword) {
+    const admin = await prisma.staffUser.findFirst({
+      where: { tenantId: id, role: "admin" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (admin) {
+      await prisma.staffUser.update({
+        where: { id: admin.id },
+        data: { passwordHash: await hashPassword(body.adminPassword.trim()) },
+      });
+    }
+  }
 
   return NextResponse.json(updated);
 }

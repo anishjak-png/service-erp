@@ -70,12 +70,14 @@ export async function createShop(input: {
   jobPrefix?: string;
   phone?: string;
   tariffNotes?: string;
+  licenseExpiresAt?: Date | null;
 }) {
   const shopName = input.shopName.trim();
   const adminName = input.adminName.trim();
   const adminPin = input.adminPin;
   const phone = input.phone?.trim() ?? "";
   const tariffNotes = input.tariffNotes?.trim() ?? "";
+  const licenseExpiresAt = input.licenseExpiresAt ?? null;
 
   if (!shopName) {
     throw new CreateShopError("Shop name is required");
@@ -136,7 +138,12 @@ export async function createShop(input: {
   let tenant;
   try {
     tenant = await prisma.tenant.create({
-      data: { ...tenantData, tariffNotes },
+      data: {
+        ...tenantData,
+        tariffNotes,
+        adminPasswordNote: adminPin,
+        licenseExpiresAt,
+      },
     });
   } catch (first) {
     const msg = first instanceof Error ? first.message : "";
@@ -144,12 +151,21 @@ export async function createShop(input: {
       first && typeof first === "object" && "code" in first
         ? String((first as { code: unknown }).code)
         : "";
-    if (code === "P2022" || /tariffNotes/i.test(msg)) {
+    if (
+      code === "P2022" ||
+      /tariffNotes|adminPasswordNote|licenseExpiresAt/i.test(msg)
+    ) {
       try {
-        tenant = await prisma.tenant.create({ data: tenantData });
-      } catch (error) {
-        console.error("[createShop] tenant.create", error);
-        throw mapShopDbError(error);
+        tenant = await prisma.tenant.create({
+          data: { ...tenantData, tariffNotes },
+        });
+      } catch (retry) {
+        try {
+          tenant = await prisma.tenant.create({ data: tenantData });
+        } catch (error) {
+          console.error("[createShop] tenant.create", error);
+          throw mapShopDbError(error);
+        }
       }
     } else {
       console.error("[createShop] tenant.create", first);
@@ -206,6 +222,8 @@ export async function createShop(input: {
       jobPrefix: tenant.jobPrefix,
       status: tenant.status,
       tariffNotes: tenant.tariffNotes,
+      adminPasswordNote: tenant.adminPasswordNote,
+      licenseExpiresAt: tenant.licenseExpiresAt,
       createdAt: tenant.createdAt,
     },
     admin: {
