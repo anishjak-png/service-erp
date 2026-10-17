@@ -76,7 +76,9 @@ export function PlatformDashboard() {
   const [licenseExpiresAt, setLicenseExpiresAt] = useState("");
   const [tariffDrafts, setTariffDrafts] = useState<Record<string, string>>({});
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
+  const [mobileDrafts, setMobileDrafts] = useState<Record<string, string>>({});
   const [licenseDrafts, setLicenseDrafts] = useState<Record<string, string>>({});
+  const [editingLoginId, setEditingLoginId] = useState<string | null>(null);
 
   async function loadShops() {
     const res = await fetch("/api/platform/shops");
@@ -142,7 +144,11 @@ export function PlatformDashboard() {
     }
   }
 
-  async function patchShop(id: string, body: Record<string, unknown>, okMessage: string) {
+  async function patchShop(
+    id: string,
+    body: Record<string, unknown>,
+    okMessage: string
+  ): Promise<boolean> {
     setUpdatingId(id);
     setError("");
     setSaved("");
@@ -155,12 +161,14 @@ export function PlatformDashboard() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Could not update shop");
-        return;
+        return false;
       }
       setSaved(okMessage);
       await loadShops();
+      return true;
     } catch {
       setError("Could not reach the server.");
+      return false;
     } finally {
       setUpdatingId(null);
     }
@@ -173,17 +181,35 @@ export function PlatformDashboard() {
   async function saveShopDetails(id: string) {
     const shop = shops.find((s) => s.id === id);
     const notes = (tariffDrafts[id] ?? shop?.tariffNotes ?? "").trim();
-    const password = (passwordDrafts[id] ?? shop?.adminPassword ?? "").trim();
     const license = licenseDrafts[id] ?? toDateInput(shop?.licenseExpiresAt);
     await patchShop(
       id,
       {
         tariffNotes: notes,
-        adminPassword: password || undefined,
         licenseExpiresAt: license || null,
       },
       "Shop details saved."
     );
+  }
+
+  async function saveLogin(id: string) {
+    const shop = shops.find((s) => s.id === id);
+    const mobile = (mobileDrafts[id] ?? shop?.adminMobile ?? "").replace(/\D/g, "");
+    const password = (passwordDrafts[id] ?? shop?.adminPassword ?? "").trim();
+    if (mobile.length !== 10) {
+      setError("Valid 10-digit admin mobile required");
+      return;
+    }
+    if (password.length < 4) {
+      setError("Admin password must be at least 4 characters");
+      return;
+    }
+    const ok = await patchShop(
+      id,
+      { adminMobile: mobile, adminPassword: password },
+      "Admin login saved."
+    );
+    if (ok) setEditingLoginId(null);
   }
 
   async function logout() {
@@ -367,33 +393,106 @@ export function PlatformDashboard() {
                         }`}
                       >
                         {shop.status === "active" ? "LIVE" : "LOCKED"}
+                      </span>
                     </div>
                   </div>
                   <div className="grid gap-2 rounded-md bg-slate-50 p-3 text-xs sm:grid-cols-2">
-                    <p>
-                      <span className="font-medium text-slate-500">Admin username</span>
-                      <br />
-                      <span className="font-mono text-sm text-slate-900">
-                        {shop.adminMobile || "—"}
-                      </span>
-                      {shop.adminName ? (
-                        <span className="text-slate-500"> · {shop.adminName}</span>
-                      ) : null}
-                    </p>
-                    <label className="block font-medium text-slate-500">
-                      Admin password
-                      <input
-                        type="text"
-                        value={passwordDrafts[shop.id] ?? shop.adminPassword ?? ""}
-                        onChange={(e) =>
-                          setPasswordDrafts((prev) => ({
-                            ...prev,
-                            [shop.id]: e.target.value,
-                          }))
-                        }
-                        className={`${inputClass} mt-1 h-9 font-mono`}
-                      />
-                    </label>
+                    {editingLoginId === shop.id ? (
+                      <>
+                        <Field label="Admin username">
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={10}
+                            value={
+                              mobileDrafts[shop.id] ?? shop.adminMobile ?? ""
+                            }
+                            onChange={(e) =>
+                              setMobileDrafts((prev) => ({
+                                ...prev,
+                                [shop.id]: e.target.value.replace(/\D/g, "").slice(0, 10),
+                              }))
+                            }
+                            className={`${inputClass} h-9 font-mono`}
+                          />
+                        </Field>
+                        <Field label="Admin password">
+                          <input
+                            type="text"
+                            value={
+                              passwordDrafts[shop.id] ?? shop.adminPassword ?? ""
+                            }
+                            onChange={(e) =>
+                              setPasswordDrafts((prev) => ({
+                                ...prev,
+                                [shop.id]: e.target.value,
+                              }))
+                            }
+                            className={`${inputClass} h-9 font-mono`}
+                          />
+                        </Field>
+                        <div className="flex flex-wrap gap-2 sm:col-span-2">
+                          <button
+                            type="button"
+                            disabled={updatingId === shop.id}
+                            onClick={() => saveLogin(shop.id)}
+                            className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            Save login
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingLoginId(null)}
+                            className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          <span className="font-medium text-slate-500">
+                            Admin username
+                          </span>
+                          <br />
+                          <span className="font-mono text-sm text-slate-900">
+                            {shop.adminMobile || "—"}
+                          </span>
+                          {shop.adminName ? (
+                            <span className="text-slate-500"> · {shop.adminName}</span>
+                          ) : null}
+                        </p>
+                        <p>
+                          <span className="font-medium text-slate-500">
+                            Admin password
+                          </span>
+                          <br />
+                          <span className="font-mono text-sm text-slate-900">
+                            {shop.adminPassword || "—"}
+                          </span>
+                        </p>
+                        <div className="sm:col-span-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingLoginId(shop.id);
+                              setMobileDrafts((prev) => ({
+                                ...prev,
+                                [shop.id]: shop.adminMobile ?? "",
+                              }));
+                              setPasswordDrafts((prev) => ({
+                                ...prev,
+                                [shop.id]: shop.adminPassword ?? "",
+                              }));
+                            }}
+                            className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            Edit login
+                          </button>
+                        </div>
+                      </>
+                    )}
                     <div className="sm:col-span-2">
                       <p className="font-medium text-slate-500">
                         License expiry{" "}
