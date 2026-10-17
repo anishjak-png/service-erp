@@ -133,7 +133,19 @@ export async function GET() {
       });
     }
 
-    session.deviceStatus = device.status;
+    if (session.role === "admin" && device.status === "pending") {
+      await prisma.staffDevice.update({
+        where: { id: device.id },
+        data: {
+          status: "approved",
+          approvedAt: new Date(),
+          approvedById: session.staffUserId,
+        },
+      });
+      session.deviceStatus = "approved";
+    } else {
+      session.deviceStatus = device.status;
+    }
     await session.save();
   }
 

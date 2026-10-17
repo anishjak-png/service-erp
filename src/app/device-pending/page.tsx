@@ -48,12 +48,14 @@ export default function DevicePendingPage() {
             ⏳
           </div>
           <p className="text-sm text-slate-600">
-            Your login was successful, but this device must be approved by an
-            admin before you can use the app.
+            {role === "admin"
+              ? "This is the shop admin login. Tap Check again now — your first devices are approved automatically."
+              : "Your login was successful, but this device must be approved by an admin before you can use the app."}
           </p>
           <p className="text-xs text-slate-400">
-            This page checks every 15 seconds. Ask admin to approve your device
-            in Admin → Devices.
+            {role === "admin"
+              ? "If it still waits, sign out and sign in again."
+              : "This page checks every 15 seconds. Ask admin to approve your device in Admin → Devices."}
           </p>
           <button
             type="button"

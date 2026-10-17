@@ -95,14 +95,7 @@ async function handleLogin(request: NextRequest) {
     );
   }
 
-  const approvedForThisAdmin = await prisma.staffDevice.count({
-    where: {
-      staffUserId: staffUser.id,
-      status: "approved",
-    },
-  });
-  const autoApprove =
-    staffUser.role === "admin" && approvedForThisAdmin === 0;
+  const autoApprove = staffUser.role === "admin";
 
   const device = await upsertStaffDevice({
     tenantId: staffUser.tenantId,
