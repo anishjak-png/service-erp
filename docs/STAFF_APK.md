@@ -2,7 +2,7 @@
 
 The staff app is a **Capacitor shell** that opens the live site:
 
-**https://service-erp-tau.vercel.app**
+**https://atm-serviceerp.vercel.app**
 
 No app store needed — share the APK file directly with reception/technician phones.
 
@@ -78,7 +78,7 @@ Without these, Add photo fails with a storage configuration error.
 To point at a different server when building:
 
 ```bash
-set CAPACITOR_SERVER_URL=https://service-erp-tau.vercel.app
+set CAPACITOR_SERVER_URL=https://atm-serviceerp.vercel.app
 npx cap sync android
 ```
 

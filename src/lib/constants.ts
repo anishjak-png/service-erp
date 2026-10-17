@@ -24,6 +24,10 @@ function resolveAppUrl(): string {
     return `https://${vercel.replace(/\/$/, "")}`;
   }
 
+  if (process.env.NODE_ENV === "production") {
+    return "https://atm-serviceerp.vercel.app";
+  }
+
   return "http://localhost:3000";
 }
 

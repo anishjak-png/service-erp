@@ -4,7 +4,7 @@ title Build Service ERP Staff APK
 cd /d "%~dp0..\.."
 
 echo.
-if not defined CAPACITOR_SERVER_URL set "CAPACITOR_SERVER_URL=https://service-erp-tau.vercel.app"
+if not defined CAPACITOR_SERVER_URL set "CAPACITOR_SERVER_URL=https://atm-serviceerp.vercel.app"
 echo  Building debug APK for staff - loads %CAPACITOR_SERVER_URL%
 echo.
 
