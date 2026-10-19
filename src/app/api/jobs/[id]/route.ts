@@ -503,7 +503,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data.assignedTechnicianId = body.assignedTechnicianId || null;
     }
 
-    if (body.completedByTechnicianId !== undefined) {
+    if (
+      body.completedByTechnicianId !== undefined &&
+      body.status !== "JobCompleted"
+    ) {
       if (!canEditCompletedBy(session.role)) {
         return NextResponse.json(
           { error: "Only admin can change completed by technician" },
