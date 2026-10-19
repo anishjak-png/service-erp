@@ -230,7 +230,7 @@ const STATUS_ACTION_LABELS: Partial<Record<JobStatusValue, string>> = {
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { role, technicianId } = useAuth();
+  const { role, technicianId, technicianName } = useAuth();
   const [job, setJob] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -366,9 +366,18 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (!showReadyForm && !showAssigneeEdit && !showCompletedByEdit) return;
     void catalogTechnicians().then((data) => {
-      if (Array.isArray(data)) setTechnicians(data);
+      if (!Array.isArray(data)) return;
+      setTechnicians(data);
+      if (showReadyForm && technicianId) {
+        setReadyCompletedById((current) => current || technicianId);
+      }
     });
-  }, [showReadyForm, showAssigneeEdit, showCompletedByEdit]);
+  }, [
+    showReadyForm,
+    showAssigneeEdit,
+    showCompletedByEdit,
+    technicianId,
+  ]);
 
   useEffect(() => {
     fetchJob();
@@ -446,8 +455,8 @@ export default function JobDetailPage() {
         return;
       }
       setReadyCompletedById(
-        job?.completedByTechnician?.id ??
-          technicianId ??
+        technicianId ??
+          job?.completedByTechnician?.id ??
           job?.assignedTechnician?.id ??
           ""
       );
@@ -1054,6 +1063,12 @@ export default function JobDetailPage() {
                       {tech.name}
                     </option>
                   ))}
+                  {technicianId &&
+                    !technicians.some((tech) => tech.id === technicianId) && (
+                      <option value={technicianId}>
+                        {technicianName ?? "You"}
+                      </option>
+                    )}
                 </select>
               </div>
             )}
