@@ -273,6 +273,7 @@ export function StaffTab() {
             >
               <option value="technician">Technician</option>
               <option value="reception">Reception</option>
+              <option value="verifier">Verifier</option>
               <option value="admin">Admin</option>
             </select>
             {form.role === "technician" && (
@@ -346,6 +347,7 @@ export function StaffTab() {
                 >
                   <option value="technician">Technician</option>
                   <option value="reception">Reception</option>
+                  <option value="verifier">Verifier</option>
                   <option value="admin">Admin</option>
                 </select>
                 {editForm.role === "technician" && (
