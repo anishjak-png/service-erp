@@ -25,6 +25,7 @@ import { requireTenantId, tenantWhere } from "@/lib/tenant";
 import { ACTIVE_JOB_STATUSES, TECH_MY_BOARD_STATUSES, WARRANTY_JOB_STATUSES, warrantyFieldsSupported } from "@/lib/prisma-statuses";
 import { MAX_PRODUCT_PHOTOS, MAX_WARRANTY_CARD_PHOTOS } from "@/lib/constants";
 import { getJobListSelect } from "@/lib/job-selects";
+import { getJobBoardCounts } from "@/lib/job-board-counts";
 import {
   isSupabaseStorageConfigured,
   uploadProductPhotoBuffers,
@@ -123,6 +124,7 @@ async function listJobs(request: NextRequest) {
     where.outsourcedToId = outsourcedToId;
   }
 
+  const includeCounts = searchParams.get("includeCounts") === "1";
   const isMobileSearch = detectSearchQueryType(q) === "mobile";
   const pageParam = searchParams.get("page");
   const paginate = pageParam != null;
@@ -142,7 +144,16 @@ async function listJobs(request: NextRequest) {
       : [{ receivedAt: "desc" as const }];
 
   if (paginate) {
-    const [total, jobs] = await Promise.all([
+    const countsPromise =
+      includeCounts && session.tenantId
+        ? getJobBoardCounts({
+            tenantId: session.tenantId,
+            technicianId: session.technicianId,
+            myScope: isTechnicianMyScope,
+          })
+        : Promise.resolve(null);
+
+    const [total, jobs, counts] = await Promise.all([
       prisma.jobCard.count({ where }),
       prisma.jobCard.findMany({
         where,
@@ -151,6 +162,7 @@ async function listJobs(request: NextRequest) {
         skip: (page - 1) * limit,
         take: limit,
       }),
+      countsPromise,
     ]);
 
     return NextResponse.json({
@@ -159,6 +171,7 @@ async function listJobs(request: NextRequest) {
       page,
       pageSize: limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+      ...(counts ? { counts } : {}),
     });
   }
 

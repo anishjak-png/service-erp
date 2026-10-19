@@ -98,6 +98,7 @@ export default function ReadyVerificationPage() {
         )}
         <Link
           href="/jobs/search?status=JobCompleted"
+          prefetch={false}
           className="block text-center text-xs font-medium text-emerald-700"
         >
           Open in search

@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, Suspense } from "react";
+import { catalogPartners } from "@/lib/catalog-cache";
 import { fastGet, peekFastCache, peekStaleCache } from "@/lib/fast-fetch";
 
 type PendingJob = {
@@ -66,6 +67,7 @@ type PaginatedJobsResponse = {
   page: number;
   pageSize: number;
   totalPages: number;
+  counts?: { active: number; outsourced: number; warranty: number };
 };
 
 function parseActiveJobs(items: PendingJob[]): PendingJob[] {
@@ -144,6 +146,7 @@ function PendingJobsContent() {
       const params = new URLSearchParams({
         page: String(pageNumber),
         limit: String(JOBS_PAGE_SIZE),
+        includeCounts: "1",
       });
 
       if (filter === "Outsourced") {
@@ -170,6 +173,11 @@ function PendingJobsContent() {
         setTotal(warm.total);
         setPage(warm.page);
         setTotalPages(warm.totalPages);
+        if (warm.counts) {
+          setActiveTotal(warm.counts.active);
+          setOutsourcedTotal(warm.counts.outsourced);
+          setWarrantyTotal(warm.counts.warranty);
+        }
         setLoading(false);
       } else {
         setLoading(true);
@@ -198,6 +206,11 @@ function PendingJobsContent() {
         setTotal(data.total);
         setPage(data.page);
         setTotalPages(data.totalPages);
+        if (data.counts) {
+          setActiveTotal(data.counts.active);
+          setOutsourcedTotal(data.counts.outsourced);
+          setWarrantyTotal(data.counts.warranty);
+        }
       } finally {
         setLoading(false);
       }
@@ -208,57 +221,21 @@ function PendingJobsContent() {
   useEffect(() => {
     if (!role && !roleLoaded) return;
     if (role !== "technician") return;
+    if (!(scope === "my" && statusFilter === "all")) return;
     void fastGet<TechnicianStats>("/api/technician/stats", { ttlMs: 8_000 }).then(
       (data) => {
         if (data && "pending" in data) setStats(data);
       }
     );
-  }, [role, roleLoaded]);
+  }, [role, roleLoaded, scope, statusFilter]);
 
   useEffect(() => {
     if (!role && !roleLoaded) return;
-    void fastGet<unknown>("/api/outsource-partners", { ttlMs: 120_000 }).then(
-      (data) => {
-        if (Array.isArray(data)) setPartners(data);
-      }
-    );
-  }, [role, roleLoaded]);
-
-  useEffect(() => {
-    if (!role && !roleLoaded) return;
-
-    async function loadTabTotal(query: string, setter: (n: number) => void) {
-      const data = await fastGet<PaginatedJobsResponse | { error?: string } | null>(
-        `/api/jobs?${query}`,
-        { ttlMs: 60_000 }
-      );
-      if (data && "total" in data) {
-        setter(data.total);
-      }
-    }
-
-    const activeQuery = new URLSearchParams({
-      active: "true",
-      page: "1",
-      limit: "1",
+    if (statusFilter !== "Outsourced") return;
+    void catalogPartners().then((data) => {
+      if (Array.isArray(data)) setPartners(data);
     });
-    if (role === "technician") {
-      activeQuery.set("scope", scope);
-    }
-
-    void loadTabTotal(activeQuery.toString(), setActiveTotal);
-    // Warranty / Outsourced chips only appear on All Jobs for technicians.
-    if (!(role === "technician" && scope === "my")) {
-      void loadTabTotal(
-        "status=Outsourced&scope=all&page=1&limit=1",
-        setOutsourcedTotal
-      );
-      void loadTabTotal(
-        "warranty=true&scope=all&page=1&limit=1",
-        setWarrantyTotal
-      );
-    }
-  }, [roleLoaded, role, scope]);
+  }, [role, roleLoaded, statusFilter]);
 
   useEffect(() => {
     if (!role && !roleLoaded) return;
@@ -403,6 +380,7 @@ function PendingJobsContent() {
           </span>
           <Link
             href={isTechnician ? "/tokens" : "/tokens?status=Pending"}
+            prefetch={false}
             className="rounded-md border border-slate-300 bg-white py-2 text-center text-xs font-semibold text-slate-700"
           >
             {isTechnician ? "My Tokens" : "Tokens"}
@@ -623,12 +601,14 @@ function PendingJobsContent() {
         <div className="mt-3 grid grid-cols-2 gap-2">
           <Link
             href="/jobs/search"
+            prefetch={false}
             className="rounded-md border border-slate-300 bg-white py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Search
           </Link>
           <Link
             href={jobs[0] ? `/jobs/${jobs[0].id}` : "/jobs/search"}
+            prefetch={false}
             className="rounded-md bg-emerald-600 py-2 text-center text-sm font-semibold text-white hover:bg-emerald-700"
           >
             Update Status

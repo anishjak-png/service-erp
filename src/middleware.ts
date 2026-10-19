@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, isDeviceApproved } from "@/lib/session";
+import { getIronSession } from "iron-session";
+import { isDeviceApproved, sessionOptions, type SessionData } from "@/lib/session";
 import { resolveTenantSlugFromRequest } from "@/lib/tenant-host";
 
-/** Routes that never need a session cookie read in middleware. */
+/** Public / customer routes: never decrypt the session cookie. */
 const sessionFreePaths = new Set([
   "/signup",
   "/track",
+  "/device-pending",
   "/api/auth/login",
   "/api/auth/signup",
   "/api/webhooks/whatsapp",
@@ -14,22 +16,22 @@ const sessionFreePaths = new Set([
   "/shop-login",
 ]);
 
-const sessionFreePrefixes = ["/j/", "/api/track"];
+const sessionFreePrefixes = ["/j/", "/api/track", "/api/webhooks"];
 
 const publicPaths = new Set([
   "/",
   "/j",
   "/track",
   "/signup",
+  "/device-pending",
   "/api/auth/login",
   "/api/auth/signup",
-  "/device-pending",
   "/api/webhooks/whatsapp",
   "/platform/login",
   "/api/platform/auth/login",
   "/shop-login",
 ]);
-const publicPrefixes = ["/j/", "/api/track"];
+const publicPrefixes = ["/j/", "/api/track", "/api/webhooks"];
 
 function isSessionFree(pathname: string): boolean {
   if (sessionFreePaths.has(pathname)) return true;
@@ -79,6 +81,10 @@ export async function middleware(request: NextRequest) {
 
 async function runMiddleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const requestHeaders = withTenantHeaders(request);
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   if (
     pathname.startsWith("/_next") ||
@@ -86,19 +92,19 @@ async function runMiddleware(request: NextRequest) {
     pathname.startsWith("/manifest") ||
     pathname.startsWith("/icons")
   ) {
-    return NextResponse.next();
+    return response;
   }
 
-  const requestHeaders = withTenantHeaders(request);
-
-  // Signup / track / public job pages: do not touch the session cookie.
+  // Track / public job pages / webhooks / login: do not decrypt the session.
   if (isSessionFree(pathname)) {
-    return NextResponse.next({
-      request: { headers: requestHeaders },
-    });
+    return response;
   }
 
-  const session = await getSession();
+  const session = await getIronSession<SessionData>(
+    request,
+    response,
+    sessionOptions
+  );
 
   if (isPlatformRoute(pathname) && !isSessionFree(pathname)) {
     if (!session.isLoggedIn || !session.isPlatformAdmin) {
@@ -107,9 +113,7 @@ async function runMiddleware(request: NextRequest) {
       }
       return NextResponse.redirect(new URL("/platform/login", request.url));
     }
-    return NextResponse.next({
-      request: { headers: requestHeaders },
-    });
+    return response;
   }
 
   if (pathname === "/" && session.isLoggedIn && session.isPlatformAdmin) {
@@ -119,9 +123,7 @@ async function runMiddleware(request: NextRequest) {
     if (!shopLogin) {
       return NextResponse.redirect(new URL("/platform", request.url));
     }
-    return NextResponse.next({
-      request: { headers: requestHeaders },
-    });
+    return response;
   }
 
   if (pathname === "/" && session.isLoggedIn && !session.isPlatformAdmin) {
@@ -139,9 +141,7 @@ async function runMiddleware(request: NextRequest) {
   }
 
   if (isPublic(pathname)) {
-    return NextResponse.next({
-      request: { headers: requestHeaders },
-    });
+    return response;
   }
 
   if (!session.isLoggedIn) {
@@ -188,11 +188,11 @@ async function runMiddleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next({
-    request: { headers: requestHeaders },
-  });
+  return response;
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icons/|manifest\\.json|track(?:/|$)|j(?:/|$)|api/track|api/webhooks|api/auth/login|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|apk)$).*)",
+  ],
 };

@@ -6,8 +6,23 @@ import {
   clearSession,
   getSession,
   isDeviceApproved,
-  touchSession,
 } from "@/lib/session";
+
+const LAST_SEEN_MIN_MS = 5 * 60 * 1000;
+const lastSeenTouchedAt = new Map<string, number>();
+
+function maybeTouchLastSeen(
+  tenantId: string,
+  staffUserId: string,
+  deviceId: string
+) {
+  const key = `${tenantId}:${staffUserId}:${deviceId}`;
+  const now = Date.now();
+  const prev = lastSeenTouchedAt.get(key) ?? 0;
+  if (now - prev < LAST_SEEN_MIN_MS) return false;
+  lastSeenTouchedAt.set(key, now);
+  return true;
+}
 
 export async function GET() {
   const session = await getSession();
@@ -59,20 +74,18 @@ export async function GET() {
       }
     }
 
-    await touchSession(session);
-
-    after(async () => {
-      try {
-        if (deviceId && tenantId) {
+    if (deviceId && tenantId && maybeTouchLastSeen(tenantId, staffUserId, deviceId)) {
+      after(async () => {
+        try {
           await prisma.staffDevice.updateMany({
             where: { tenantId, staffUserId, deviceId, status: "approved" },
             data: { lastSeenAt: new Date() },
           });
+        } catch {
+          /* non-blocking */
         }
-      } catch {
-        /* non-blocking */
-      }
-    });
+      });
+    }
 
     if (role === "admin" && tenantId) {
       payload.pendingDeviceCount = await countPendingDevices(tenantId);
@@ -110,9 +123,11 @@ export async function GET() {
     return NextResponse.json({ isLoggedIn: false });
   }
 
+  let sessionDirty = false;
+
   if (!session.tenantId) {
     session.tenantId = staffUser.tenantId;
-    await session.save();
+    sessionDirty = true;
   }
 
   if (session.deviceId) {
@@ -133,6 +148,11 @@ export async function GET() {
       });
     }
 
+    const nextStatus =
+      session.role === "admin" && device.status === "pending"
+        ? "approved"
+        : device.status;
+
     if (session.role === "admin" && device.status === "pending") {
       await prisma.staffDevice.update({
         where: { id: device.id },
@@ -142,10 +162,15 @@ export async function GET() {
           approvedById: session.staffUserId,
         },
       });
-      session.deviceStatus = "approved";
-    } else {
-      session.deviceStatus = device.status;
     }
+
+    if (session.deviceStatus !== nextStatus) {
+      session.deviceStatus = nextStatus;
+      sessionDirty = true;
+    }
+  }
+
+  if (sessionDirty) {
     await session.save();
   }
 
@@ -172,6 +197,5 @@ export async function GET() {
     );
   }
 
-  await touchSession(session);
   return NextResponse.json(payload);
 }

@@ -33,18 +33,21 @@ export function ReceptionDashboard({ data }: ReceptionDashboardProps) {
       <div className="grid grid-cols-2 gap-2">
         <Link
           href="/jobs/new"
+          prefetch={false}
           className="rounded-md bg-emerald-600 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-700"
         >
           New Job
         </Link>
         <Link
           href="/tokens/new"
+          prefetch={false}
           className="rounded-md border border-emerald-600 bg-white py-3 text-center text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
         >
           New Token
         </Link>
         <Link
           href="/tokens?status=Pending"
+          prefetch={false}
           className="col-span-2 rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           Pending Tokens{data.pendingTokens > 0 ? ` (${data.pendingTokens})` : ""}

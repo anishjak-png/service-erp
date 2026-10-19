@@ -3,6 +3,7 @@ import {
   getWebhookVerifyToken,
   processMetaWhatsAppWebhook,
   verifyWebhookSignature,
+  webhookHasInboundMessages,
 } from "@/lib/notifications/inbound/meta-webhook";
 import { isWhatsAppEnabled } from "@/lib/tenant";
 
@@ -40,6 +41,10 @@ export async function POST(request: NextRequest) {
   if (!verifyWebhookSignature(rawBody, signature)) {
     console.error("[WhatsApp Webhook] Invalid signature");
     return new NextResponse("Invalid signature", { status: 403 });
+  }
+
+  if (!webhookHasInboundMessages(rawBody)) {
+    return new NextResponse("OK", { status: 200 });
   }
 
   try {

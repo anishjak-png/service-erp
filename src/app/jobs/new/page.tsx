@@ -11,6 +11,10 @@ import {
   isPhotoPickerCancelled,
   pickNativePhoto,
 } from "@/lib/native-photo";
+import {
+  catalogApplianceLookups,
+  catalogApplianceTechnicians,
+} from "@/lib/catalog-cache";
 import { fastGet, invalidateJobCaches } from "@/lib/fast-fetch";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -89,15 +93,12 @@ export default function NewJobPage() {
 
     setLookupsLoading(true);
     try {
-      const data = await fastGet<{
+      const data = await catalogApplianceLookups<{
         brands?: string[];
         complaints?: string[];
         accessories?: string[];
         error?: string;
-      }>(
-        `/api/appliance-lookups?applianceType=${encodeURIComponent(appliance)}`,
-        { ttlMs: 120_000 }
-      );
+      }>(appliance);
       if (!data || !("brands" in data)) {
         setLookupOptions((prev) => ({ ...prev, brand: [], complaint: [], accessory: [] }));
         return;
@@ -151,9 +152,9 @@ export default function NewJobPage() {
   }, []);
 
   async function fetchAssignedTech(appliance: string) {
-    const mappings = await fastGet<
+    const mappings = await catalogApplianceTechnicians<
       Array<{ applianceType: string; technician: { name: string } }> | { error?: string }
-    >("/api/appliance-technicians", { ttlMs: 120_000 });
+    >();
     const list = Array.isArray(mappings) ? mappings : [];
     const match = list.find(
       (m) => m.applianceType === appliance
@@ -583,6 +584,7 @@ export default function NewJobPage() {
             </button>
             <Link
               href={`/jobs/${createdJob.id}`}
+              prefetch={false}
               className="inline-flex h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               View Job Details

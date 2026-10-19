@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
 
   if (batchCategories.length > 0) {
     const options = await getLookupOptionsBatch(batchCategories);
-    return NextResponse.json(options);
+    return NextResponse.json(options, {
+      headers: { "Cache-Control": "private, max-age=120" },
+    });
   }
 
   const category = request.nextUrl.searchParams.get("category") as LookupCategory;
@@ -33,7 +35,9 @@ export async function GET(request: NextRequest) {
   }
 
   const options = await getLookupOptions(category);
-  return NextResponse.json(options);
+  return NextResponse.json(options, {
+    headers: { "Cache-Control": "private, max-age=120" },
+  });
 }
 
 export async function POST(request: NextRequest) {

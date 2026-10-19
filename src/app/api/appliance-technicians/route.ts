@@ -15,7 +15,9 @@ export async function GET() {
       orderBy: { applianceType: "asc" },
     });
 
-    return NextResponse.json(mappings);
+    return NextResponse.json(mappings, {
+      headers: { "Cache-Control": "private, max-age=120" },
+    });
   } catch (error) {
     console.error("GET /api/appliance-technicians failed:", error);
     return NextResponse.json(

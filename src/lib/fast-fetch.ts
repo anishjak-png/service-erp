@@ -76,17 +76,27 @@ export function prefetchStaffCaches() {
   void fastGet("/api/customers/directory", { ttlMs: 300_000 });
   void fastGet("/api/lookups?category=appliance", { ttlMs: 120_000 });
   void fastGet("/api/jobs?delivery=true", { ttlMs: 60_000 });
-  void fastGet("/api/jobs?page=1&limit=25&active=true", { ttlMs: 60_000 });
-  void fastGet("/api/jobs?page=1&limit=25&active=true&scope=my", {
+  void fastGet("/api/jobs?page=1&limit=25&active=true&includeCounts=1", {
     ttlMs: 60_000,
   });
+  void fastGet(
+    "/api/jobs?page=1&limit=25&active=true&scope=my&includeCounts=1",
+    {
+      ttlMs: 60_000,
+    }
+  );
 }
 
 export function prefetchNavHref(href: string) {
   const path = href.split("?")[0];
   if (path === "/jobs/pending" || href.includes("/jobs/pending")) {
     const scope = href.includes("scope=my") ? "my" : null;
-    const params = new URLSearchParams({ page: "1", limit: "25", active: "true" });
+    const params = new URLSearchParams({
+      page: "1",
+      limit: "25",
+      active: "true",
+      includeCounts: "1",
+    });
     if (scope) params.set("scope", scope);
     void fastGet(`/api/jobs?${params}`, { ttlMs: 60_000 });
   } else if (path === "/jobs/delivery") {

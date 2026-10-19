@@ -40,6 +40,11 @@ import {
   isPhotoPickerCancelled,
   pickNativePhoto,
 } from "@/lib/native-photo";
+import {
+  catalogApplianceLookups,
+  catalogPartners,
+  catalogTechnicians,
+} from "@/lib/catalog-cache";
 import { fastGet, invalidateJobCaches, peekStaleCache } from "@/lib/fast-fetch";
 import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
@@ -345,35 +350,25 @@ export default function JobDetailPage() {
   }, [id, router]);
 
   useEffect(() => {
-    if (role === "reception" || role === "admin" || role === "technician") {
-      fetch("/api/outsource-partners")
-        .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data)) setOutsourcePartners(data);
-        });
-    }
-  }, [role]);
+    if (!showOutsourceForm) return;
+    void catalogPartners().then((data) => {
+      if (Array.isArray(data)) setOutsourcePartners(data);
+    });
+  }, [showOutsourceForm]);
 
   useEffect(() => {
-    if (!job?.applianceType) return;
-    fetch(
-      `/api/appliance-lookups?applianceType=${encodeURIComponent(job.applianceType)}`
-    )
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.accessories) setAccessoryOptions(data.accessories);
-      });
-  }, [job?.applianceType]);
+    if (!editingAccessories || !job?.applianceType) return;
+    void catalogApplianceLookups(job.applianceType).then((data) => {
+      if (data?.accessories) setAccessoryOptions(data.accessories);
+    });
+  }, [editingAccessories, job?.applianceType]);
 
   useEffect(() => {
-    if (role === "reception" || role === "admin" || role === "technician") {
-      fetch("/api/technicians")
-        .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data)) setTechnicians(data);
-        });
-    }
-  }, [role]);
+    if (!showReadyForm && !showAssigneeEdit && !showCompletedByEdit) return;
+    void catalogTechnicians().then((data) => {
+      if (Array.isArray(data)) setTechnicians(data);
+    });
+  }, [showReadyForm, showAssigneeEdit, showCompletedByEdit]);
 
   useEffect(() => {
     fetchJob();
@@ -889,6 +884,7 @@ export default function JobDetailPage() {
       <div className="space-y-2">
         <Link
           href={backHref}
+          prefetch={false}
           className="inline-block text-xs font-medium text-emerald-600 hover:underline"
         >
           ← Back
@@ -1412,6 +1408,7 @@ export default function JobDetailPage() {
               {(job.status === "Ready" || job.status === "Return") && (
                 <Link
                   href={`/jobs/delivery?q=${encodeURIComponent(job.jobNumber)}`}
+                  prefetch={false}
                   className="inline-flex h-8 flex-1 min-w-[5.5rem] items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Delivery

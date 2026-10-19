@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { catalogApplianceLookups } from "@/lib/catalog-cache";
 import { fastGet } from "@/lib/fast-fetch";
 
 type LookupCategory = "appliance" | "brand" | "complaint";
@@ -63,10 +64,7 @@ export function CreatableSelect({
         setInternalOptions([]);
         return [];
       }
-      const res = await fetch(
-        `/api/appliance-lookups?applianceType=${encodeURIComponent(applianceType)}`
-      );
-      const data = await res.json();
+      const data = await catalogApplianceLookups(applianceType);
       const values =
         category === "brand"
           ? ((data.brands as string[] | undefined) ?? [])

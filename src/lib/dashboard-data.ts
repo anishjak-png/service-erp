@@ -1,5 +1,15 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { sumBillSplits } from "@/lib/currency";
+
+function istCalendarDay(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
 
 function todayRange() {
   const today = new Date();
@@ -184,27 +194,20 @@ export async function getAdminDashboardData(tenantId: string) {
   };
 }
 
-const DASH_TTL_MS = 30_000;
-const dashMemory = new Map<string, { at: number; data: unknown }>();
-
 export async function getReceptionDashboardDataCached(tenantId: string) {
-  const key = `reception:${tenantId}`;
-  const hit = dashMemory.get(key);
-  if (hit && Date.now() - hit.at < DASH_TTL_MS) {
-    return hit.data as Awaited<ReturnType<typeof getReceptionDashboardData>>;
-  }
-  const data = await getReceptionDashboardData(tenantId);
-  dashMemory.set(key, { at: Date.now(), data });
-  return data;
+  const day = istCalendarDay();
+  return unstable_cache(
+    () => getReceptionDashboardData(tenantId),
+    ["dashboard-reception", tenantId, day],
+    { revalidate: 30 }
+  )();
 }
 
 export async function getAdminDashboardDataCached(tenantId: string) {
-  const key = `admin:${tenantId}`;
-  const hit = dashMemory.get(key);
-  if (hit && Date.now() - hit.at < DASH_TTL_MS) {
-    return hit.data as Awaited<ReturnType<typeof getAdminDashboardData>>;
-  }
-  const data = await getAdminDashboardData(tenantId);
-  dashMemory.set(key, { at: Date.now(), data });
-  return data;
+  const day = istCalendarDay();
+  return unstable_cache(
+    () => getAdminDashboardData(tenantId),
+    ["dashboard-admin", tenantId, day],
+    { revalidate: 30 }
+  )();
 }

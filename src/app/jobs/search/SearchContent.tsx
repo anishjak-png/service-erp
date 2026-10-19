@@ -16,6 +16,7 @@ import {
 } from "@/lib/job-assignee-display";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { catalogPartners } from "@/lib/catalog-cache";
 import { fastGet, peekFastCache } from "@/lib/fast-fetch";
 import {
   matchDirectoryCustomers,
@@ -139,6 +140,7 @@ export default function SearchContent() {
   const [directory, setDirectory] = useState<DirectoryCustomer[]>([]);
   const { scope, setScope } = useTechnicianJobScope();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const echoingUrlRef = useRef(false);
 
   useEffect(() => {
     void fastGet<DirectoryCustomer[]>("/api/customers/directory", {
@@ -172,6 +174,33 @@ export default function SearchContent() {
         warranty?: boolean;
       } = {}
     ) => {
+      const hasBrowse =
+        Boolean(browse.technicianId) ||
+        Boolean(browse.applianceType) ||
+        Boolean(browse.brand) ||
+        Boolean(browse.minAgeDays) ||
+        Boolean(browse.active) ||
+        Boolean(browse.receivedPeriod) ||
+        Boolean(browse.deliveredPeriod) ||
+        Boolean(browse.readyPeriod) ||
+        Boolean(browse.returnedPeriod) ||
+        Boolean(browse.pipeline) ||
+        Boolean(browse.completedByTechnicianId) ||
+        Boolean(browse.outsourcedToId) ||
+        Boolean(browse.warrantyBrand) ||
+        Boolean(browse.warranty);
+
+      if (!q.trim() && !selectedCustomerId && status === "all" && !hasBrowse) {
+        setResponse({
+          mode: "jobs",
+          searchType: "empty",
+          customer: null,
+          jobs: [],
+        });
+        setLoading(false);
+        return;
+      }
+
       const params = new URLSearchParams();
       if (selectedCustomerId) {
         params.set("customerId", selectedCustomerId);
@@ -232,6 +261,20 @@ export default function SearchContent() {
       }
       setResponse(cached);
       setLoading(false);
+      if (
+        status === "Warranty" &&
+        !browse.warrantyBrand &&
+        cached.mode === "jobs"
+      ) {
+        const brands = Array.from(
+          new Set(
+            cached.jobs
+              .map((j) => j.brand)
+              .filter((b): b is string => typeof b === "string" && b.length > 0)
+          )
+        ).sort((a, b) => a.localeCompare(b));
+        setWarrantyBrands(brands);
+      }
     },
     []
   );
@@ -274,8 +317,7 @@ export default function SearchContent() {
   useEffect(() => {
     if (!role && !roleLoaded) return;
     if (statusFilter !== "Outsourced" && !initialOutsourcedToId) return;
-    fetch("/api/outsource-partners")
-      .then((r) => r.json())
+    void catalogPartners()
       .then((data) => {
         if (Array.isArray(data)) setPartners(data);
       })
@@ -284,6 +326,10 @@ export default function SearchContent() {
 
   useEffect(() => {
     if (!role && !roleLoaded) return;
+    if (echoingUrlRef.current) {
+      echoingUrlRef.current = false;
+      return;
+    }
 
     const nextStatus = normalizeStatusFilter(initialStatus, initialWarrantyOnly);
     setQuery(initialQ);
@@ -328,24 +374,6 @@ export default function SearchContent() {
     search,
   ]);
 
-  useEffect(() => {
-    if (statusFilter !== "Warranty") return;
-    fetch("/api/jobs/search?warranty=true")
-      .then((r) => r.json())
-      .then((data) => {
-        const list: JobResult[] = Array.isArray(data?.jobs) ? data.jobs : [];
-        const brands = Array.from(
-          new Set(
-            list
-              .map((j) => j.brand)
-              .filter((b): b is string => typeof b === "string" && b.length > 0)
-          )
-        ).sort((a, b) => a.localeCompare(b));
-        setWarrantyBrands(brands);
-      })
-      .catch(() => setWarrantyBrands([]));
-  }, [statusFilter]);
-
   function updateUrl(
     q: string,
     status: string,
@@ -382,6 +410,7 @@ export default function SearchContent() {
     if (status === "Warranty" && warrantyBrand) {
       params.set("warrantyBrand", warrantyBrand);
     }
+    echoingUrlRef.current = true;
     router.replace(`/jobs/search?${params.toString()}`, { scroll: false });
   }
 
@@ -456,14 +485,8 @@ export default function SearchContent() {
     };
 
     if (!trimmed) {
-      setResponse({
-        mode: "jobs",
-        searchType: "empty",
-        customer: null,
-        jobs: [],
-      });
-      setLoading(false);
-      debounceRef.current = setTimeout(run, 80);
+      updateUrl(value, statusFilter, "");
+      runSearch(value, statusFilter, "");
       return;
     }
 
@@ -717,7 +740,9 @@ export default function SearchContent() {
           ))}
         </div>
       ) : jobs.length === 0 ? (
-        <p className="text-center text-sm text-slate-500">No jobs found</p>
+        <p className="text-center text-sm text-slate-500">
+          {hasActiveSearch ? "No jobs found" : "Type UT, mobile, or name"}
+        </p>
       ) : showSingleJob ? (
         <JobListCard {...searchCardProps(jobs[0])} />
       ) : showCustomerHistory && customer ? (

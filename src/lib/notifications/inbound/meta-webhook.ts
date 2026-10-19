@@ -230,6 +230,20 @@ async function persistInboundMessage(
   });
 }
 
+export function webhookHasInboundMessages(rawBody: string): boolean {
+  try {
+    const payload = JSON.parse(rawBody) as MetaWebhookBody;
+    for (const entry of payload.entry ?? []) {
+      for (const change of entry.changes ?? []) {
+        if ((change.value?.messages ?? []).length > 0) return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 export async function processMetaWhatsAppWebhook(
   rawBody: string
 ): Promise<void> {

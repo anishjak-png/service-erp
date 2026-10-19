@@ -71,30 +71,35 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
         <div className="grid grid-cols-2 gap-2">
           <Link
             href="/jobs/new"
+            prefetch={false}
             className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             New Job
           </Link>
           <Link
             href="/tokens/new"
+            prefetch={false}
             className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             New Token
           </Link>
           <Link
             href="/tokens?status=Pending"
+            prefetch={false}
             className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Pending Tokens{data.pendingTokens > 0 ? ` (${data.pendingTokens})` : ""}
           </Link>
           <Link
             href="/jobs/ready"
+            prefetch={false}
             className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Ready
           </Link>
           <Link
             href="/jobs/delivery"
+            prefetch={false}
             className="rounded-md border border-slate-300 bg-white py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Delivery
