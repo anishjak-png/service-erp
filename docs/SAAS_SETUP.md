@@ -59,7 +59,7 @@ Creates **Ramnath Agencies** (login mobile `9440010001`, password `ramnath123`).
 - Create shops: `/platform` (after `/platform/login`)
 - Public self-serve `/signup` is closed
 - Staff login: `/` — mobile + password (mobile is unique across all shops)
-- Public track: `/track?tenant=demo` (shop name still required for customers)
+- Public track: `/track` (job number from the receipt) or `/j/SE12`
 
 ## Print bridge (per shop PC)
 

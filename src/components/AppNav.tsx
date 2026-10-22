@@ -164,7 +164,7 @@ export function AppNav() {
                     });
                   }
                 }}
-                placeholder="Search UT, mobile, or name"
+                placeholder="Search Job No, Mobile or Name"
                 className="h-8 min-w-0 flex-1 rounded-md border border-emerald-600 bg-emerald-950/40 px-2.5 text-sm text-white placeholder:text-emerald-300/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               />
               <button

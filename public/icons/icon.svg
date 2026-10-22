@@ -1,20 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="US">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10b981"/>
-      <stop offset="100%" stop-color="#047857"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
-  <text
-    x="256"
-    y="292"
-    font-family="Segoe UI, system-ui, -apple-system, sans-serif"
-    font-size="196"
-    font-weight="800"
-    fill="#ffffff"
-    text-anchor="middle"
-    letter-spacing="-8"
-  >US</text>
-  <rect x="156" y="318" width="200" height="6" rx="3" fill="#ffffff" opacity="0.55"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Service ERP">
+  <rect width="512" height="512" rx="96" fill="#059669"/>
+  <g fill="#FACC15" transform="rotate(-35 256 256)">
+    <path d="M148 168c22-28 62-32 88-12l8 6-48 48 28 28 48-48 6 8c20 26 16 66-12 88-18 14-42 18-64 10l-8-4-92 92c-14 14-38 14-52 0-14-14-14-38 0-52l92-92-4-8c-8-22-4-46 10-64z"/>
+  </g>
+  <g fill="#FDE047" transform="rotate(40 256 256)">
+    <rect x="244" y="96" width="24" height="220" rx="8"/>
+    <rect x="232" y="300" width="48" height="88" rx="10"/>
+    <path d="M248 388h16l6 48h-28z"/>
+  </g>
 </svg>

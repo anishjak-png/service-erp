@@ -4,6 +4,7 @@ import {
   isValidMobile,
   normalizeMobile,
 } from "@/lib/password";
+import { allocateUniqueJobPrefix } from "@/lib/job-prefix";
 import { getTenantBySlug, slugify } from "@/lib/tenant";
 import { seedGenericAppliances } from "@/lib/tenant-seed";
 
@@ -44,6 +45,9 @@ function mapShopDbError(error: unknown): CreateShopError {
     }
     if (fields.includes("slug")) {
       return new CreateShopError("That shop name is already taken", 409);
+    }
+    if (fields.includes("jobPrefix")) {
+      return new CreateShopError("That job prefix is already used by another shop", 409);
     }
     return new CreateShopError("That shop already exists", 409);
   }
@@ -106,13 +110,9 @@ export async function createShop(input: {
     throw new CreateShopError("That shop name is already taken", 409);
   }
 
-  let jobPrefix = (input.jobPrefix ?? jobPrefixFromName(shopName))
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-  if (jobPrefix.length < 1 || jobPrefix.length > 6) {
-    jobPrefix = "SE";
-  }
+  const jobPrefix = await allocateUniqueJobPrefix(
+    input.jobPrefix ?? jobPrefixFromName(shopName)
+  );
 
   const adminMobile = normalizeMobile(input.adminMobile);
   const mobileTaken = await prisma.staffUser.findUnique({

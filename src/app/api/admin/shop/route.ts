@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session";
 import { requireTenantId } from "@/lib/tenant";
 import { slugify } from "@/lib/tenant";
 import { todayIstDate } from "@/lib/tokens";
+import { isJobPrefixTaken, normalizeJobPrefix } from "@/lib/job-prefix";
 
 export async function GET() {
   const session = await getSession();
@@ -62,11 +63,17 @@ export async function PATCH(request: NextRequest) {
     data.logoUrl = body.logoUrl ? String(body.logoUrl).trim() : null;
   }
   if (typeof body.jobPrefix === "string") {
-    const prefix = body.jobPrefix.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const prefix = normalizeJobPrefix(body.jobPrefix);
     if (prefix.length < 1 || prefix.length > 6) {
       return NextResponse.json(
         { error: "Job prefix must be 1–6 letters/numbers" },
         { status: 400 }
+      );
+    }
+    if (await isJobPrefixTaken(prefix, tenantId)) {
+      return NextResponse.json(
+        { error: "That job prefix is already used by another shop" },
+        { status: 409 }
       );
     }
     data.jobPrefix = prefix;

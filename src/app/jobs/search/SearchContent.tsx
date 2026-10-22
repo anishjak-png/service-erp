@@ -608,7 +608,7 @@ export default function SearchContent() {
         type="search"
         value={query}
         onChange={(e) => handleQueryChange(e.target.value)}
-        placeholder="UT number, mobile, or name"
+        placeholder="Search Job No, Mobile or Name"
         className="mb-3 flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
         autoFocus
       />
@@ -741,7 +741,7 @@ export default function SearchContent() {
         </div>
       ) : jobs.length === 0 ? (
         <p className="text-center text-sm text-slate-500">
-          {hasActiveSearch ? "No jobs found" : "Type UT, mobile, or name"}
+          {hasActiveSearch ? "No jobs found" : "Type Job No, Mobile or Name"}
         </p>
       ) : showSingleJob ? (
         <JobListCard {...searchCardProps(jobs[0])} />

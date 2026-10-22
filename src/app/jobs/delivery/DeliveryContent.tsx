@@ -133,7 +133,7 @@ export default function DeliveryContent() {
           type="search"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
-          placeholder="Search UT or mobile"
+          placeholder="Search Job No or Mobile"
           className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-base placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           autoFocus
         />

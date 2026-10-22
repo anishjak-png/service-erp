@@ -158,6 +158,9 @@ export function ShopSettingsTab() {
           className="mt-1 flex h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
           required
         />
+        <span className="mt-1 block font-normal text-slate-400">
+          Unique across shops (used on receipts and tracking)
+        </span>
       </label>
 
       <label className="block text-xs font-medium text-slate-600">
