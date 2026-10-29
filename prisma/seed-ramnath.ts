@@ -301,7 +301,7 @@ const TOKENS: TokenSeed[] = [
     applianceType: "Iron Box",
     brand: "Philips",
     complaint: "Not heating",
-    status: "JobCompleted",
+    status: "Ready",
     assignedTech: "Tech B",
     estimatedMinutes: 45,
     serviceCharge: 200,

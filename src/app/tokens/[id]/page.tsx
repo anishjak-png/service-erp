@@ -125,7 +125,7 @@ export default function TokenDetailPage() {
 
         {token.status === "Pending" && (role === "technician" || role === "admin" || role === "reception") && (
           <section className="space-y-2 rounded-lg border border-teal-200 bg-teal-50 p-3">
-            <p className="text-sm font-semibold text-teal-900">Job Completed</p>
+            <p className="text-sm font-semibold text-teal-900">Mark Ready</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label
@@ -217,15 +217,15 @@ export default function TokenDetailPage() {
                   setShowErrors(true);
                   return;
                 }
-                updateStatus("JobCompleted", {
+                updateStatus("Ready", {
                   serviceCharge: Number(serviceCharge),
                   serviceKind,
                   sparesAmount: sparesAmount === "" ? 0 : Number(sparesAmount),
                 });
               }}
-              className="w-full rounded-md bg-teal-700 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              className="w-full rounded-md bg-emerald-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
             >
-              Mark completed
+              Mark Ready
             </button>
           </section>
         )}

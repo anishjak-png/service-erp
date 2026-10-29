@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const data: Record<string, unknown> = {};
 
   if (body.status) {
-    const next = body.status as TokenStatus;
+    let next = body.status as TokenStatus;
     if (!TOKEN_STATUSES.includes(next)) {
       return NextResponse.json({ error: "Invalid token status" }, { status: 400 });
     }
@@ -72,31 +72,40 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: 400 }
       );
     }
+    // Tokens skip Job Completed — technician marks Ready with billing.
     if (next === "JobCompleted") {
-      if (body.serviceCharge === undefined || body.serviceCharge === "") {
-        return NextResponse.json(
-          { error: "Service charge is required" },
-          { status: 400 }
-        );
-      }
-      const parsed = resolveBillSplit(body);
-      if (!parsed) {
-        return NextResponse.json(
-          { error: "Invalid service or spares amount" },
-          { status: 400 }
-        );
-      }
-      if (!isServiceKind(body.serviceKind) && !isServiceKind(existing.serviceKind)) {
-        return NextResponse.json(
-          { error: "Select minor or major service" },
-          { status: 400 }
-        );
-      }
-      data.serviceCharge = parsed.serviceCharge;
-      data.sparesAmount = parsed.sparesAmount;
-      data.serviceAmount = parsed.serviceAmount;
-      if (isServiceKind(body.serviceKind)) {
-        data.serviceKind = body.serviceKind;
+      next = "Ready";
+    }
+    if (next === "Ready") {
+      const needsBilling =
+        existing.status === "Pending" ||
+        existing.serviceCharge == null;
+      if (needsBilling) {
+        if (body.serviceCharge === undefined || body.serviceCharge === "") {
+          return NextResponse.json(
+            { error: "Service charge is required" },
+            { status: 400 }
+          );
+        }
+        const parsed = resolveBillSplit(body);
+        if (!parsed) {
+          return NextResponse.json(
+            { error: "Invalid service or spares amount" },
+            { status: 400 }
+          );
+        }
+        if (!isServiceKind(body.serviceKind) && !isServiceKind(existing.serviceKind)) {
+          return NextResponse.json(
+            { error: "Select minor or major service" },
+            { status: 400 }
+          );
+        }
+        data.serviceCharge = parsed.serviceCharge;
+        data.sparesAmount = parsed.sparesAmount;
+        data.serviceAmount = parsed.serviceAmount;
+        if (isServiceKind(body.serviceKind)) {
+          data.serviceKind = body.serviceKind;
+        }
       }
       data.completedAt = existing.completedAt ?? new Date();
       data.completedByTechnicianId =
@@ -104,8 +113,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         session.technicianId ||
         existing.completedByTechnicianId ||
         existing.assignedTechnicianId;
-    }
-    if (next === "Ready") {
       data.readyAt = existing.readyAt ?? new Date();
     }
     if (next === "Delivered") {
