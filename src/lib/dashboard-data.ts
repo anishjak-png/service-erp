@@ -114,7 +114,15 @@ async function getDashboardBoard(tenantId: string) {
   const { today, tomorrow } = todayRange();
   const tenantFilter = { tenantId };
 
-  const [todayJobs, statusGroups, readyRows, pendingTokens, warrantyJobs] =
+  const [
+    todayJobs,
+    statusGroups,
+    readyRows,
+    todayTokens,
+    tokenStatusGroups,
+    readyTokensRows,
+    warrantyJobs,
+  ] =
     await Promise.all([
       prisma.jobCard.count({
         where: { ...tenantFilter, receivedAt: { gte: today, lt: tomorrow } },
@@ -129,30 +137,79 @@ async function getDashboardBoard(tenantId: string) {
         select: readyPickupSelect,
       }),
       prisma.tokenCard.count({
-        where: { ...tenantFilter, status: "Pending" },
+        where: { ...tenantFilter, receivedAt: { gte: today, lt: tomorrow } },
+      }),
+      prisma.tokenCard.groupBy({
+        by: ["status"],
+        _count: { id: true },
+        where: tenantFilter,
+      }),
+      prisma.tokenCard.findMany({
+        where: { ...tenantFilter, status: "Ready" },
+        select: {
+          id: true,
+          tokenNumber: true,
+          brand: true,
+          applianceType: true,
+          readyAt: true,
+          serviceAmount: true,
+          serviceCharge: true,
+          sparesAmount: true,
+          customer: { select: { name: true, mobile: true } },
+          completedByTechnician: { select: { name: true } },
+        },
       }),
       warrantyFieldsSupported() && WARRANTY_JOB_STATUSES.length > 0
         ? prisma.jobCard.count({ where: warrantyCountWhere(tenantId) })
         : Promise.resolve(0),
     ]);
 
+  const tokenCounts = Object.fromEntries(
+    tokenStatusGroups.map((g) => [g.status, g._count.id])
+  );
+
   return {
     todayJobs,
-    pendingTokens,
+    todayTokens,
+    pendingTokens: tokenCounts.Pending ?? 0,
+    readyTokens: tokenCounts.Ready ?? 0,
+    deliveredTokens: tokenCounts.Delivered ?? 0,
     warrantyJobs,
     ...countsFromGroups(statusGroups),
     readyRows,
+    readyTokensRows,
   };
 }
 
 function mapReadyPickup(
-  readyRows: Awaited<ReturnType<typeof getDashboardBoard>>["readyRows"]
+  board: Awaited<ReturnType<typeof getDashboardBoard>>
 ) {
-  return sortReadyForPickup(readyRows).map((j) => ({
+  const jobs = board.readyRows.map((j) => ({
     ...j,
+    kind: "job" as const,
+    jobNumber: j.jobNumber,
     readyAt: j.readyAt?.toISOString() ?? null,
     expectedDeliveryAt: j.expectedDeliveryAt?.toISOString() ?? null,
+    deliveryContactStatus: j.deliveryContactStatus,
+    completedByOutsource: j.completedByOutsource,
   }));
+  const tokens = board.readyTokensRows.map((t) => ({
+    id: t.id,
+    kind: "token" as const,
+    jobNumber: t.tokenNumber,
+    brand: t.brand,
+    applianceType: t.applianceType,
+    readyAt: t.readyAt?.toISOString() ?? null,
+    serviceAmount: t.serviceAmount,
+    serviceCharge: t.serviceCharge,
+    sparesAmount: t.sparesAmount,
+    deliveryContactStatus: "not_contacted" as const,
+    expectedDeliveryAt: null,
+    customer: t.customer,
+    completedByTechnician: t.completedByTechnician,
+    completedByOutsource: null,
+  }));
+  return sortReadyForPickup([...jobs, ...tokens]);
 }
 
 export async function getReceptionDashboardData(tenantId: string) {
@@ -160,6 +217,9 @@ export async function getReceptionDashboardData(tenantId: string) {
   return {
     todayJobs: board.todayJobs,
     pendingTokens: board.pendingTokens,
+    todayTokens: board.todayTokens,
+    readyTokens: board.readyTokens,
+    deliveredTokens: board.deliveredTokens,
     pendingJobs: board.pendingJobs,
     readyJobs: board.readyJobs,
     deliveredJobs: board.deliveredJobs,
@@ -167,7 +227,7 @@ export async function getReceptionDashboardData(tenantId: string) {
     returnJobs: board.returnJobs,
     outsourcedJobs: board.outsourcedJobs,
     warrantyJobs: board.warrantyJobs,
-    readyForPickup: mapReadyPickup(board.readyRows),
+    readyForPickup: mapReadyPickup(board),
   };
 }
 
@@ -193,11 +253,17 @@ export async function getAdminDashboardData(tenantId: string) {
     getDashboardBoard(tenantId),
     getCachedCollection(tenantId),
   ]);
-  const readySplit = sumBillSplits(board.readyRows);
+  const readySplit = sumBillSplits([
+    ...board.readyRows,
+    ...board.readyTokensRows,
+  ]);
 
   return {
     todayJobs: board.todayJobs,
     pendingTokens: board.pendingTokens,
+    todayTokens: board.todayTokens,
+    readyTokens: board.readyTokens,
+    deliveredTokens: board.deliveredTokens,
     pendingJobs: board.pendingJobs,
     readyJobs: board.readyJobs,
     deliveredJobs: board.deliveredJobs,
@@ -214,7 +280,7 @@ export async function getAdminDashboardData(tenantId: string) {
     pendingCollection: readySplit.totalCollection,
     pendingServiceCharge: readySplit.serviceChargeTotal,
     pendingSparesAmount: readySplit.sparesAmountTotal,
-    readyForPickup: mapReadyPickup(board.readyRows),
+    readyForPickup: mapReadyPickup(board),
   };
 }
 

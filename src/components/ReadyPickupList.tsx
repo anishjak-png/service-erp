@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 
 type ReadyJob = {
   id: string;
+  kind?: "job" | "token";
   jobNumber: string;
   brand: string;
   applianceType: string;
@@ -139,10 +140,12 @@ export function ReadyPickupList({
                 : null);
             const doneLabel = formatDoneDatestamp(job.readyAt);
 
+            const isToken = job.kind === "token";
             return (
               <JobListCard
-                key={job.id}
+                key={`${job.kind ?? "job"}-${job.id}`}
                 id={job.id}
+                kind={isToken ? "token" : "job"}
                 jobNumber={job.jobNumber}
                 status="Ready"
                 customerName={job.customer.name}
@@ -153,10 +156,23 @@ export function ReadyPickupList({
                 sparesAmount={job.sparesAmount}
                 showBillSplit={showBillSplit}
                 meta={[repairedBy, doneLabel].filter(Boolean).join(" · ")}
-                deliveryContactStatus={job.deliveryContactStatus}
+                deliveryContactStatus={
+                  isToken ? undefined : job.deliveryContactStatus
+                }
                 expectedDeliveryAt={job.expectedDeliveryAt}
-                enableDeliveryCallLog
-                onDeliveryCallLogged={(result) => handleCallLogged(job.id, result)}
+                enableDeliveryCallLog={!isToken}
+                onDeliveryCallLogged={
+                  isToken
+                    ? undefined
+                    : (result) => handleCallLogged(job.id, result)
+                }
+                badge={
+                  isToken ? (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                      Token
+                    </span>
+                  ) : undefined
+                }
               />
             );
           })}

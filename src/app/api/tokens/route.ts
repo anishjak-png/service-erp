@@ -20,6 +20,7 @@ import {
 } from "@/lib/lookups";
 import { enqueueTokenReceiptPrint } from "@/lib/print-queue";
 import { revalidateDashboard } from "@/lib/dashboard-data";
+import { getPeriodRange, isReportPeriod } from "@/lib/reports";
 
 const TOKEN_SELECT = {
   id: true,
@@ -52,6 +53,10 @@ export async function GET(request: NextRequest) {
   const tenantFilter = tenantWhere(session);
   const scope = request.nextUrl.searchParams.get("scope");
   const status = request.nextUrl.searchParams.get("status");
+  const receivedPeriodRaw = request.nextUrl.searchParams.get("receivedPeriod");
+  const receivedPeriod = isReportPeriod(receivedPeriodRaw)
+    ? receivedPeriodRaw
+    : null;
 
   const where: Record<string, unknown> = { ...tenantFilter };
   if (
@@ -61,9 +66,13 @@ export async function GET(request: NextRequest) {
   ) {
     where.assignedTechnicianId = session.technicianId;
   }
+  if (receivedPeriod) {
+    const { start, end } = getPeriodRange(receivedPeriod);
+    where.receivedAt = { gte: start, lt: end };
+  }
   if (status && status !== "all") {
     where.status = status as TokenStatus;
-  } else {
+  } else if (!receivedPeriod) {
     where.status = { not: "Delivered" };
   }
 

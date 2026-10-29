@@ -13,6 +13,7 @@ type ReceptionDashboardProps = {
     warrantyJobs: number;
     readyForPickup: Array<{
       id: string;
+      kind?: "job" | "token";
       jobNumber: string;
       brand: string;
       applianceType: string;

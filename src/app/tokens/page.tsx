@@ -35,16 +35,25 @@ function TokensContent() {
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<"my" | "all">("my");
   const canCreate = role === "reception" || role === "admin";
-  const statusFilter =
-    searchParams.get("status") === "Pending" ||
-    (canCreate && searchParams.get("status") !== "all")
-      ? "Pending"
-      : "all";
+  const statusParam = searchParams.get("status");
+  const receivedPeriod = searchParams.get("receivedPeriod");
+  const statusFilter: "today" | "Pending" | "Ready" | "Delivered" | "all" =
+    receivedPeriod === "today"
+      ? "today"
+      : statusParam === "Ready" ||
+          statusParam === "Delivered" ||
+          statusParam === "Pending" ||
+          statusParam === "all"
+        ? statusParam
+        : canCreate
+          ? "Pending"
+          : "all";
 
   const load = useCallback(async () => {
     const qs = new URLSearchParams();
     if (role === "technician") qs.set("scope", scope);
-    if (statusFilter === "Pending") qs.set("status", "Pending");
+    if (statusFilter === "today") qs.set("receivedPeriod", "today");
+    else if (statusFilter !== "all") qs.set("status", statusFilter);
     const res = await fetch(`/api/tokens?${qs.toString()}`);
     const data = await res.json();
     setTokens(Array.isArray(data) ? data : []);
@@ -56,10 +65,11 @@ function TokensContent() {
     load();
   }, [loaded, load]);
 
-  function setStatus(next: "Pending" | "all") {
-    const qs = new URLSearchParams(searchParams.toString());
-    if (next === "all") qs.set("status", "all");
-    else qs.set("status", "Pending");
+  function setStatus(next: "today" | "Pending" | "Ready" | "Delivered" | "all") {
+    const qs = new URLSearchParams();
+    if (next === "today") qs.set("receivedPeriod", "today");
+    else if (next === "all") qs.set("status", "all");
+    else qs.set("status", next);
     router.replace(`/tokens?${qs.toString()}`);
   }
 
@@ -103,32 +113,32 @@ function TokensContent() {
         </div>
 
         {canCreate ? (
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => setStatus("Pending")}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                statusFilter === "Pending"
-                  ? "bg-emerald-600 text-white"
-                  : "border border-slate-300 bg-white text-slate-600"
-              }`}
-            >
-              Pending
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatus("all")}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                statusFilter === "all"
-                  ? "bg-emerald-600 text-white"
-                  : "border border-slate-300 bg-white text-slate-600"
-              }`}
-            >
-              All open
-            </button>
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                { id: "today", label: "Today" },
+                { id: "Pending", label: "Pending" },
+                { id: "Ready", label: "Ready" },
+                { id: "Delivered", label: "Delivered" },
+                { id: "all", label: "All open" },
+              ] as const
+            ).map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => setStatus(chip.id)}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  statusFilter === chip.id
+                    ? "bg-emerald-600 text-white"
+                    : "border border-slate-300 bg-white text-slate-600"
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
             <Link
               href="/tokens/new"
-              className="ml-auto rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800"
+              className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800"
             >
               New Token
             </Link>
@@ -139,7 +149,15 @@ function TokensContent() {
           <p className="text-sm text-slate-500">Loading…</p>
         ) : tokens.length === 0 ? (
           <p className="rounded-md border border-slate-200 bg-white px-3 py-4 text-center text-sm text-slate-500">
-            {statusFilter === "Pending" ? "No pending tokens" : "No tokens"}
+            {statusFilter === "Pending"
+              ? "No pending tokens"
+              : statusFilter === "Ready"
+                ? "No ready tokens"
+                : statusFilter === "Delivered"
+                  ? "No delivered tokens"
+                  : statusFilter === "today"
+                    ? "No tokens today"
+                    : "No tokens"}
           </p>
         ) : (
           tokens.map((token) => (

@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 
 type DeliveryJob = {
   id: string;
+  kind?: "job" | "token";
   jobNumber: string;
   status: string;
   applianceType: string;
@@ -24,6 +25,45 @@ type DeliveryJob = {
   expectedDeliveryAt?: string | null;
   customer: { mobile: string; name?: string | null };
 };
+
+type DeliveryToken = {
+  id: string;
+  tokenNumber: string;
+  status: string;
+  applianceType: string;
+  brand?: string | null;
+  readyAt?: string | null;
+  serviceAmount?: number | null;
+  serviceCharge?: number | null;
+  sparesAmount?: number | null;
+  customer: { mobile: string; name?: string | null };
+};
+
+function tokenToDeliveryJob(token: DeliveryToken): DeliveryJob {
+  return {
+    id: token.id,
+    kind: "token",
+    jobNumber: token.tokenNumber,
+    status: token.status,
+    applianceType: token.applianceType,
+    brand: token.brand,
+    readyAt: token.readyAt,
+    serviceAmount: token.serviceAmount,
+    serviceCharge: token.serviceCharge,
+    sparesAmount: token.sparesAmount,
+    customer: token.customer,
+  };
+}
+
+function matchesQuery(row: DeliveryJob, q: string) {
+  if (!q) return true;
+  const needle = q.trim().toLowerCase();
+  return (
+    row.jobNumber.toLowerCase().includes(needle) ||
+    row.customer.mobile.includes(needle.replace(/\s/g, "")) ||
+    (row.customer.name ?? "").toLowerCase().includes(needle)
+  );
+}
 
 const DELIVERY_STATUSES = new Set(["Ready", "Return"]);
 
@@ -44,6 +84,7 @@ export default function DeliveryContent() {
     const params = new URLSearchParams({ delivery: "true" });
     if (q.trim()) params.set("q", q.trim());
     const url = `/api/jobs?${params}`;
+    const tokensUrl = "/api/tokens?status=Ready";
     const warm =
       peekFastCache<DeliveryJob[]>(url, 60_000) ??
       peekStaleCache<DeliveryJob[]>(url);
@@ -54,16 +95,23 @@ export default function DeliveryContent() {
       setLoading(true);
     }
 
-    const data = await fastGet<DeliveryJob[] | { error?: string }>(url, {
-      ttlMs: 60_000,
-    });
-    if (!data || !Array.isArray(data)) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-
-    setResults(data.filter((j) => DELIVERY_STATUSES.has(j.status)));
+    const [data, tokens] = await Promise.all([
+      fastGet<DeliveryJob[] | { error?: string }>(url, { ttlMs: 60_000 }),
+      fastGet<DeliveryToken[] | { error?: string }>(tokensUrl, { ttlMs: 15_000 }),
+    ]);
+    const jobs = Array.isArray(data)
+      ? data.filter((j) => DELIVERY_STATUSES.has(j.status)).map((j) => ({
+          ...j,
+          kind: "job" as const,
+        }))
+      : [];
+    const readyTokens = Array.isArray(tokens)
+      ? tokens.filter((t) => t.status === "Ready").map(tokenToDeliveryJob)
+      : [];
+    const needle = q.trim();
+    setResults(
+      [...jobs, ...readyTokens].filter((row) => matchesQuery(row, needle))
+    );
     setLoading(false);
   }, []);
 
@@ -106,7 +154,9 @@ export default function DeliveryContent() {
     if (!confirm(`Mark ${job.jobNumber} as delivered?`)) return;
 
     setDeliveringId(job.id);
-    const res = await fetch(`/api/jobs/${job.id}`, {
+    const path =
+      job.kind === "token" ? `/api/tokens/${job.id}` : `/api/jobs/${job.id}`;
+    const res = await fetch(path, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "Delivered" }),
@@ -150,8 +200,8 @@ export default function DeliveryContent() {
       ) : results.length === 0 ? (
         <p className="text-center text-sm text-slate-500">
           {hasSearch
-            ? "No ready or return jobs for this search"
-            : "No jobs ready for delivery"}
+            ? "No ready jobs or tokens for this search"
+            : "No jobs or tokens ready for delivery"}
         </p>
       ) : (
         <div className="space-y-2">
@@ -167,8 +217,9 @@ export default function DeliveryContent() {
             const doneLabel = formatDoneDatestamp(job.readyAt);
             return (
               <JobListCard
-                key={job.id}
+                key={`${job.kind ?? "job"}-${job.id}`}
                 id={job.id}
+                kind={job.kind === "token" ? "token" : "job"}
                 jobNumber={job.jobNumber}
                 status={job.status}
                 customerName={job.customer.name}
@@ -180,12 +231,26 @@ export default function DeliveryContent() {
                 showBillSplit={role === "admin"}
                 meta={doneLabel ?? undefined}
                 deliveryContactStatus={
-                  job.deliveryContactStatus ?? "not_contacted"
+                  job.kind === "token"
+                    ? undefined
+                    : job.deliveryContactStatus ?? "not_contacted"
                 }
                 expectedDeliveryAt={job.expectedDeliveryAt}
-                enableDeliveryCallLog
-                onDeliveryCallLogged={(result) => handleCallLogged(job.id, result)}
-                badge={<JobStatusBadge status={job.status} />}
+                enableDeliveryCallLog={job.kind !== "token"}
+                onDeliveryCallLogged={
+                  job.kind === "token"
+                    ? undefined
+                    : (result) => handleCallLogged(job.id, result)
+                }
+                badge={
+                  job.kind === "token" ? (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                      Token
+                    </span>
+                  ) : (
+                    <JobStatusBadge status={job.status} />
+                  )
+                }
                 footer={
                   <button
                     onClick={() => markDelivered(job)}

@@ -8,6 +8,9 @@ type AdminDashboardProps = {
     todayJobs: number;
     pendingJobs: number;
     pendingTokens: number;
+    todayTokens: number;
+    readyTokens: number;
+    deliveredTokens: number;
     readyJobs: number;
     deliveredJobs: number;
     waitingApprovalJobs: number;
@@ -24,6 +27,7 @@ type AdminDashboardProps = {
     pendingSparesAmount: number;
     readyForPickup: Array<{
       id: string;
+      kind?: "job" | "token";
       jobNumber: string;
       brand: string;
       applianceType: string;
@@ -145,6 +149,36 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
             label="Delivered"
             value={data.deliveredJobs}
             href="/jobs/search?status=Delivered"
+          />
+        </div>
+      </section>
+
+      <section>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Token Stats
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <StatCard
+            label="Today"
+            value={data.todayTokens}
+            href="/tokens?receivedPeriod=today"
+          />
+          <StatCard
+            label="Pending"
+            value={data.pendingTokens}
+            href="/tokens?status=Pending"
+            valueClassName="text-blue-700"
+          />
+          <StatCard
+            label="Ready"
+            value={data.readyTokens}
+            href="/tokens?status=Ready"
+            valueClassName="text-emerald-700"
+          />
+          <StatCard
+            label="Delivered"
+            value={data.deliveredTokens}
+            href="/tokens?status=Delivered"
           />
         </div>
       </section>
