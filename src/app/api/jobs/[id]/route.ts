@@ -31,6 +31,7 @@ import { getSession } from "@/lib/session";
 import { tenantWhere } from "@/lib/tenant";
 import { dispatchNotificationEventAsync } from "@/lib/notifications/events";
 import { enqueueJobDeliveryPrint } from "@/lib/print-queue";
+import { revalidateDashboard } from "@/lib/dashboard-data";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -596,6 +597,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         });
       }
 
+      revalidateDashboard(existing.tenantId);
       return NextResponse.json({ ...job, statusHistoryEntry });
     }
 
@@ -605,6 +607,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       select: getJobPatchSelect(),
     });
 
+    revalidateDashboard(existing.tenantId);
     return NextResponse.json(job);
   } catch (error) {
     console.error("PATCH /api/jobs/[id] failed:", error);

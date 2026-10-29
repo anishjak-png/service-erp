@@ -19,6 +19,7 @@ import {
   validateAccessoriesForAppliance,
 } from "@/lib/lookups";
 import { enqueueTokenReceiptPrint } from "@/lib/print-queue";
+import { revalidateDashboard } from "@/lib/dashboard-data";
 
 const TOKEN_SELECT = {
   id: true,
@@ -189,5 +190,6 @@ export async function POST(request: NextRequest) {
     console.error("[token-create] print enqueue failed", error);
   }
 
+  revalidateDashboard(tenantId);
   return NextResponse.json(token, { status: 201 });
 }

@@ -1,29 +1,25 @@
-import { unstable_cache } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { prisma } from "@/lib/db";
 import { sumBillSplits } from "@/lib/currency";
+import { WARRANTY_JOB_STATUSES, warrantyFieldsSupported } from "@/lib/prisma-statuses";
+import { getPeriodRange, istCalendarDay } from "@/lib/reports";
 
-function istCalendarDay(now = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+function dashboardTag(tenantId: string) {
+  return `dashboard-${tenantId}`;
+}
+
+export function revalidateDashboard(tenantId: string) {
+  revalidateTag(dashboardTag(tenantId), "max");
 }
 
 function todayRange() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return { today, tomorrow };
+  const { start, end } = getPeriodRange("today");
+  return { today: start, tomorrow: end };
 }
 
 function monthRange() {
-  const { today } = todayRange();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  return { monthStart, nextMonth };
+  const { start, end } = getPeriodRange("month");
+  return { monthStart: start, nextMonth: end };
 }
 
 function countsFromGroups(groups: Array<{ status: string; _count: { id: number } }>) {
@@ -35,8 +31,14 @@ function countsFromGroups(groups: Array<{ status: string; _count: { id: number }
     waitingApprovalJobs: map.WaitingForCustomerApproval ?? 0,
     returnJobs: map.Return ?? 0,
     outsourcedJobs: map.Outsourced ?? 0,
-    warrantyJobs:
-      (map.WarrantyPending ?? 0) + (map.WarrantyWithCompany ?? 0),
+  };
+}
+
+function warrantyCountWhere(tenantId: string) {
+  return {
+    tenantId,
+    isWarranty: true,
+    status: { in: WARRANTY_JOB_STATUSES },
   };
 }
 
@@ -108,48 +110,11 @@ async function sumDeliveredSplits(
   };
 }
 
-export async function getReceptionDashboardData(tenantId: string) {
+async function getDashboardBoard(tenantId: string) {
   const { today, tomorrow } = todayRange();
   const tenantFilter = { tenantId };
 
-  const [todayJobs, statusGroups, readyRows, pendingTokens] = await Promise.all([
-    prisma.jobCard.count({
-      where: { ...tenantFilter, receivedAt: { gte: today, lt: tomorrow } },
-    }),
-    prisma.jobCard.groupBy({
-      by: ["status"],
-      _count: { id: true },
-      where: tenantFilter,
-    }),
-    prisma.jobCard.findMany({
-      where: { ...tenantFilter, status: "Ready" },
-      select: readyPickupSelect,
-    }),
-    prisma.tokenCard.count({
-      where: { ...tenantFilter, status: "Pending" },
-    }),
-  ]);
-
-  const counts = countsFromGroups(statusGroups);
-
-  return {
-    todayJobs,
-    pendingTokens,
-    ...counts,
-    readyForPickup: sortReadyForPickup(readyRows).map((j) => ({
-      ...j,
-      readyAt: j.readyAt?.toISOString() ?? null,
-      expectedDeliveryAt: j.expectedDeliveryAt?.toISOString() ?? null,
-    })),
-  };
-}
-
-export async function getAdminDashboardData(tenantId: string) {
-  const { today, tomorrow } = todayRange();
-  const { monthStart, nextMonth } = monthRange();
-  const tenantFilter = { tenantId };
-
-  const [todayJobs, statusGroups, todaySplit, monthlySplit, readyRows, pendingTokens] =
+  const [todayJobs, statusGroups, readyRows, pendingTokens, warrantyJobs] =
     await Promise.all([
       prisma.jobCard.count({
         where: { ...tenantFilter, receivedAt: { gte: today, lt: tomorrow } },
@@ -159,8 +124,6 @@ export async function getAdminDashboardData(tenantId: string) {
         _count: { id: true },
         where: tenantFilter,
       }),
-      sumDeliveredSplits(tenantId, today, tomorrow),
-      sumDeliveredSplits(tenantId, monthStart, nextMonth),
       prisma.jobCard.findMany({
         where: { ...tenantFilter, status: "Ready" },
         select: readyPickupSelect,
@@ -168,46 +131,97 @@ export async function getAdminDashboardData(tenantId: string) {
       prisma.tokenCard.count({
         where: { ...tenantFilter, status: "Pending" },
       }),
+      warrantyFieldsSupported() && WARRANTY_JOB_STATUSES.length > 0
+        ? prisma.jobCard.count({ where: warrantyCountWhere(tenantId) })
+        : Promise.resolve(0),
     ]);
-
-  const counts = countsFromGroups(statusGroups);
-  const readySplit = sumBillSplits(readyRows);
 
   return {
     todayJobs,
     pendingTokens,
-    ...counts,
-    todayCollection: todaySplit.totalCollection,
-    todayServiceCharge: todaySplit.serviceChargeTotal,
-    todaySparesAmount: todaySplit.sparesAmountTotal,
-    monthlyCollection: monthlySplit.totalCollection,
-    monthlyServiceCharge: monthlySplit.serviceChargeTotal,
-    monthlySparesAmount: monthlySplit.sparesAmountTotal,
+    warrantyJobs,
+    ...countsFromGroups(statusGroups),
+    readyRows,
+  };
+}
+
+function mapReadyPickup(
+  readyRows: Awaited<ReturnType<typeof getDashboardBoard>>["readyRows"]
+) {
+  return sortReadyForPickup(readyRows).map((j) => ({
+    ...j,
+    readyAt: j.readyAt?.toISOString() ?? null,
+    expectedDeliveryAt: j.expectedDeliveryAt?.toISOString() ?? null,
+  }));
+}
+
+export async function getReceptionDashboardData(tenantId: string) {
+  const board = await getDashboardBoard(tenantId);
+  return {
+    todayJobs: board.todayJobs,
+    pendingTokens: board.pendingTokens,
+    pendingJobs: board.pendingJobs,
+    readyJobs: board.readyJobs,
+    deliveredJobs: board.deliveredJobs,
+    waitingApprovalJobs: board.waitingApprovalJobs,
+    returnJobs: board.returnJobs,
+    outsourcedJobs: board.outsourcedJobs,
+    warrantyJobs: board.warrantyJobs,
+    readyForPickup: mapReadyPickup(board.readyRows),
+  };
+}
+
+async function getCachedCollection(tenantId: string) {
+  const day = istCalendarDay();
+  const { today, tomorrow } = todayRange();
+  const { monthStart, nextMonth } = monthRange();
+  return unstable_cache(
+    async () => {
+      const [todaySplit, monthlySplit] = await Promise.all([
+        sumDeliveredSplits(tenantId, today, tomorrow),
+        sumDeliveredSplits(tenantId, monthStart, nextMonth),
+      ]);
+      return { todaySplit, monthlySplit };
+    },
+    ["dashboard-admin-money", tenantId, day],
+    { revalidate: 30, tags: [dashboardTag(tenantId)] }
+  )();
+}
+
+export async function getAdminDashboardData(tenantId: string) {
+  const [board, money] = await Promise.all([
+    getDashboardBoard(tenantId),
+    getCachedCollection(tenantId),
+  ]);
+  const readySplit = sumBillSplits(board.readyRows);
+
+  return {
+    todayJobs: board.todayJobs,
+    pendingTokens: board.pendingTokens,
+    pendingJobs: board.pendingJobs,
+    readyJobs: board.readyJobs,
+    deliveredJobs: board.deliveredJobs,
+    waitingApprovalJobs: board.waitingApprovalJobs,
+    returnJobs: board.returnJobs,
+    outsourcedJobs: board.outsourcedJobs,
+    warrantyJobs: board.warrantyJobs,
+    todayCollection: money.todaySplit.totalCollection,
+    todayServiceCharge: money.todaySplit.serviceChargeTotal,
+    todaySparesAmount: money.todaySplit.sparesAmountTotal,
+    monthlyCollection: money.monthlySplit.totalCollection,
+    monthlyServiceCharge: money.monthlySplit.serviceChargeTotal,
+    monthlySparesAmount: money.monthlySplit.sparesAmountTotal,
     pendingCollection: readySplit.totalCollection,
     pendingServiceCharge: readySplit.serviceChargeTotal,
     pendingSparesAmount: readySplit.sparesAmountTotal,
-    readyForPickup: sortReadyForPickup(readyRows).map((j) => ({
-      ...j,
-      readyAt: j.readyAt?.toISOString() ?? null,
-      expectedDeliveryAt: j.expectedDeliveryAt?.toISOString() ?? null,
-    })),
+    readyForPickup: mapReadyPickup(board.readyRows),
   };
 }
 
 export async function getReceptionDashboardDataCached(tenantId: string) {
-  const day = istCalendarDay();
-  return unstable_cache(
-    () => getReceptionDashboardData(tenantId),
-    ["dashboard-reception", tenantId, day],
-    { revalidate: 30 }
-  )();
+  return getReceptionDashboardData(tenantId);
 }
 
 export async function getAdminDashboardDataCached(tenantId: string) {
-  const day = istCalendarDay();
-  return unstable_cache(
-    () => getAdminDashboardData(tenantId),
-    ["dashboard-admin", tenantId, day],
-    { revalidate: 30 }
-  )();
+  return getAdminDashboardData(tenantId);
 }

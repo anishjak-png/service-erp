@@ -10,6 +10,7 @@ import {
   enqueueTokenDeliveryPrint,
   enqueueTokenReceiptPrint,
 } from "@/lib/print-queue";
+import { revalidateDashboard } from "@/lib/dashboard-data";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -150,5 +151,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
+  revalidateDashboard(token.tenantId);
   return NextResponse.json(token);
 }

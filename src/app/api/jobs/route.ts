@@ -26,6 +26,7 @@ import { ACTIVE_JOB_STATUSES, TECH_MY_BOARD_STATUSES, WARRANTY_JOB_STATUSES, war
 import { MAX_PRODUCT_PHOTOS, MAX_WARRANTY_CARD_PHOTOS } from "@/lib/constants";
 import { getJobListSelect } from "@/lib/job-selects";
 import { getJobBoardCounts } from "@/lib/job-board-counts";
+import { revalidateDashboard } from "@/lib/dashboard-data";
 import {
   isSupabaseStorageConfigured,
   uploadProductPhotoBuffers,
@@ -495,6 +496,7 @@ async function createJob(request: NextRequest) {
     console.info(`[job-create] sync path ${elapsedMs}ms job=${jobNumber}`);
   }
 
+  revalidateDashboard(tenantId);
   const response = NextResponse.json(job, { status: 201 });
   response.headers.set("Server-Timing", `job-create;dur=${elapsedMs}`);
   return response;
