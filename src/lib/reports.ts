@@ -1,6 +1,12 @@
-export type ReportPeriod = "today" | "week" | "month" | "year";
+export type ReportPeriod = "today" | "yesterday" | "week" | "month" | "year";
 
-const REPORT_PERIODS: ReportPeriod[] = ["today", "week", "month", "year"];
+const REPORT_PERIODS: ReportPeriod[] = [
+  "today",
+  "yesterday",
+  "week",
+  "month",
+  "year",
+];
 
 export function isReportPeriod(value: string): value is ReportPeriod {
   return REPORT_PERIODS.includes(value as ReportPeriod);
@@ -38,6 +44,11 @@ export function getPeriodRange(period: ReportPeriod) {
     return { start: istMidnight(today), end: tomorrowStart };
   }
 
+  if (period === "yesterday") {
+    const yesterday = addCalendarDays(today, -1);
+    return { start: istMidnight(yesterday), end: istMidnight(today) };
+  }
+
   if (period === "week") {
     const [y, m, d] = today.split("-").map(Number);
     const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
@@ -71,6 +82,8 @@ export function periodLabel(period: ReportPeriod): string {
   switch (period) {
     case "today":
       return "Today";
+    case "yesterday":
+      return "Yesterday";
     case "week":
       return "This week";
     case "month":

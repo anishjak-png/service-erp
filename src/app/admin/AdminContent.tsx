@@ -1248,6 +1248,7 @@ function ReportsTab() {
         {(
           [
             { id: "today", label: "Today" },
+            { id: "yesterday", label: "Yesterday" },
             { id: "week", label: "This week" },
             { id: "month", label: "This month" },
             { id: "year", label: "This year" },
