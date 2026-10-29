@@ -54,9 +54,10 @@ export async function GET(request: NextRequest) {
   const scope = request.nextUrl.searchParams.get("scope");
   const status = request.nextUrl.searchParams.get("status");
   const receivedPeriodRaw = request.nextUrl.searchParams.get("receivedPeriod");
-  const receivedPeriod = isReportPeriod(receivedPeriodRaw)
-    ? receivedPeriodRaw
-    : null;
+  const receivedPeriod =
+    receivedPeriodRaw && isReportPeriod(receivedPeriodRaw)
+      ? receivedPeriodRaw
+      : null;
 
   const where: Record<string, unknown> = { ...tenantFilter };
   if (
